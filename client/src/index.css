@@ -1,0 +1,161 @@
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --color-background: #FDF5E6;
+  --color-foreground: #1C1C1E;
+  --color-card: #FFFFFF;
+  --color-border: #E8DFD0;
+  --color-primary: #E67E22;
+  --color-secondary: #003366;
+  --color-accent: #2E8B57;
+  --color-muted: #8E8E93;
+  --font-family-sans: "Montserrat", sans-serif;
+  --radius: 0.75rem;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: "Montserrat", sans-serif;
+  background-color: #FDF5E6;
+  color: #1C1C1E;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: "Montserrat", sans-serif;
+  font-weight: 700;
+}
+
+/* ── Scrollbar hide ── */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ── Screen container ── */
+.screen-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: #FDF5E6;
+  padding-bottom: 80px;
+}
+
+/* ── Section title ── */
+.section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #8E8E93;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0 20px;
+  margin-bottom: 8px;
+}
+
+/* ── Insight card ── */
+.insight-card {
+  margin: 0 20px;
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, #FFF8EE 0%, #FEF3E2 100%);
+  border: 1.5px solid #FCDBA8;
+}
+
+/* ── Practice card ── */
+.practice-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: white;
+  border-radius: 16px;
+  border: 1px solid #E8DFD0;
+  padding: 16px;
+  margin: 0 20px 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.practice-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+
+/* ── Task block ── */
+.task-block {
+  margin: 0 20px 12px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid #E8DFD0;
+}
+
+.task-block-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.task-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  border-top: 1px solid #F0E8D8;
+  background: white;
+}
+
+/* ── Priority tags ── */
+.priority-tag-urgente { background: #FDECEA; color: #E74C3C; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+.priority-tag-alta    { background: #E8F5EE; color: #2E8B57; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+.priority-tag-media   { background: #FEF9E7; color: #D4AC0D; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+.priority-tag-baixa   { background: #EBF5FB; color: #2980B9; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+.priority-tag-sem     { background: #F5F5F5; color: #8E8E93; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+
+/* ── Flow card ── */
+.flow-card {
+  background: white;
+  border-radius: 16px;
+  border: 1px solid #E8DFD0;
+  padding: 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+
+/* ── Buttons ── */
+.btn-flow-primary {
+  background: #E67E22;
+  color: white;
+  font-weight: 700;
+  border-radius: 16px;
+  padding: 12px 24px;
+  font-size: 14px;
+  box-shadow: 0 4px 14px rgba(230,126,34,0.38);
+  transition: all 0.2s;
+  border: none;
+  cursor: pointer;
+}
+.btn-flow-primary:hover { box-shadow: 0 6px 18px rgba(230,126,34,0.48); transform: translateY(-1px); }
+.btn-flow-primary:active { transform: scale(0.95); }
+
+.btn-flow-secondary {
+  background: white;
+  color: #1C1C1E;
+  font-weight: 600;
+  border-radius: 16px;
+  padding: 12px 24px;
+  font-size: 14px;
+  border: 1px solid #E8DFD0;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+.btn-flow-secondary:hover { background: #F5EDD8; }
+
+/* ── Legacy compat ── */
+.btn-primary { background: #E67E22; color: white; border-radius: 8px; padding: 8px 16px; font-weight: 500; border: none; cursor: pointer; }
+.btn-secondary { background: #003366; color: #FDF5E6; border-radius: 8px; padding: 8px 16px; font-weight: 500; border: none; cursor: pointer; }
+.card-base { background: white; border-radius: 8px; border: 1px solid #E8DFD0; padding: 24px; }
+.flow-header { background: linear-gradient(to right, #003366, #004080); color: #FDF5E6; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+.flow-button-primary { background: #E67E22; color: #003366; font-weight: 600; padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; }
+.flow-input { background: #FDF5E6; border: 2px solid #E67E22; border-radius: 8px; padding: 8px 16px; color: #003366; }
