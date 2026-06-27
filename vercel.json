@@ -1,0 +1,23 @@
+{
+  "buildCommand": "pnpm install && pnpm build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "env": {
+    "NODE_ENV": "production",
+    "OPENAI_API_KEY": "@openai_api_key",
+    "OPENAI_API_BASE": "@openai_api_base",
+    "SUPABASE_URL": "@supabase_url",
+    "SUPABASE_ANON_KEY": "@supabase_anon_key",
+    "SUPABASE_SERVICE_ROLE_KEY": "@supabase_service_role_key",
+    "DATABASE_URL": "@database_url",
+    "GOOGLE_CLIENT_ID": "@google_client_id",
+    "GOOGLE_CLIENT_SECRET": "@google_client_secret",
+    "GOOGLE_REDIRECT_URI": "@google_redirect_uri"
+  },
+  "functions": {
+    "server/**/*.ts": {
+      "memory": 1024,
+      "maxDuration": 30
+    }
+  }
+}
