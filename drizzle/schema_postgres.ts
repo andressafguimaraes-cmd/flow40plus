@@ -1,24 +1,34 @@
-import { 
-  integer, 
-  pgEnum, 
-  pgTable, 
-  text, 
-  timestamp, 
+import {
+  integer,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
   varchar,
   serial,
   boolean
 } from "drizzle-orm/pg-core";
+
+// Enums are declared once as named, top-level exports (rather than inline
+// per-column) so drizzle-kit's snapshot/diff actually tracks them and emits
+// CREATE TYPE statements in generated migrations.
+export const roleEnum = pgEnum("role", ["user", "admin"]);
+export const difficultyEnum = pgEnum("difficulty", ["easy", "medium", "hard"]);
+export const microDifficultyEnum = pgEnum("micro_difficulty", ["easy", "medium", "hard"]);
+export const taskStatusEnum = pgEnum("task_status", ["pending", "in_progress", "completed"]);
+export const taskPriorityEnum = pgEnum("task_priority", ["urgente", "alta", "media", "baixa", "sem"]);
+export const categoryEnum = pgEnum("category", ["focus", "relief", "inspiration"]);
 
 /**
  * Core user table backing auth flow.
  */
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
-  openId: varchar("openId", { length: 64 }).notNull().unique(),
+  email: varchar("email", { length: 320 }).notNull().unique(),
+  passwordHash: varchar("password_hash", { length: 255 }),
   name: text("name"),
-  email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
-  role: pgEnum("role", ["user", "admin"])("role").default("user").notNull(),
+  role: roleEnum("role").default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -52,8 +62,9 @@ export const tasks = pgTable("tasks", {
   title: text("title").notNull(),
   description: text("description"),
   totalEstimatedTime: integer("total_estimated_time"), // in minutes
-  difficulty: pgEnum("difficulty", ["easy", "medium", "hard"])("difficulty"),
-  status: pgEnum("task_status", ["pending", "in_progress", "completed"])("status").default("pending"),
+  difficulty: difficultyEnum("difficulty"),
+  priority: taskPriorityEnum("priority").default("sem"),
+  status: taskStatusEnum("status").default("pending"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -70,7 +81,7 @@ export const microSteps = pgTable("micro_steps", {
   title: text("title").notNull(),
   description: text("description"),
   estimatedTime: integer("estimated_time").notNull(), // in minutes
-  difficulty: pgEnum("micro_difficulty", ["easy", "medium", "hard"])("difficulty"),
+  difficulty: microDifficultyEnum("difficulty"),
   completed: boolean("completed").default(false),
   order: integer("order").notNull(), // Order in the task
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -86,7 +97,7 @@ export const practices = pgTable("practices", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
   description: text("description").notNull(),
-  category: pgEnum("category", ["focus", "relief", "inspiration"])("category").notNull(),
+  category: categoryEnum("category").notNull(),
   duration: integer("duration").notNull(), // in minutes
   instructions: text("instructions"), // Detailed instructions
   createdAt: timestamp("created_at").defaultNow().notNull(),

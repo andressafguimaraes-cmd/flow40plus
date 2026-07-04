@@ -5,11 +5,13 @@ import { httpBatchLink, TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
-import { getLoginUrl } from "./const";
 import "./index.css";
 
 const queryClient = new QueryClient();
 
+// This is a client-gated SPA (App.tsx renders <Login/> when unauthenticated),
+// so on a 401 we just need react-query to refetch auth.me and land back on
+// the login screen — a full reload to "/" achieves that reliably.
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;
   if (typeof window === "undefined") return;
@@ -18,7 +20,7 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
 
   if (!isUnauthorized) return;
 
-  window.location.href = getLoginUrl();
+  window.location.href = "/";
 };
 
 queryClient.getQueryCache().subscribe(event => {

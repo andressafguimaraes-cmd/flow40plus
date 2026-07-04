@@ -69,6 +69,8 @@ export type InvokeParams = {
   model?: string;
   thinking?: Record<string, unknown>;
   reasoning?: Record<string, unknown>;
+  reasoningEffort?: "none" | "low" | "medium" | "high";
+  reasoning_effort?: "none" | "low" | "medium" | "high";
 };
 
 export type ToolCall = {
@@ -354,6 +356,8 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     model,
     thinking,
     reasoning,
+    reasoningEffort,
+    reasoning_effort,
     maxTokens,
     max_tokens,
   } = params;
@@ -388,6 +392,10 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   }
   if (reasoning) {
     payload.reasoning = reasoning;
+  }
+  const resolvedReasoningEffort = reasoning_effort ?? reasoningEffort;
+  if (resolvedReasoningEffort) {
+    payload.reasoning_effort = resolvedReasoningEffort;
   }
 
   const normalizedResponseFormat = normalizeResponseFormat({

@@ -1,5 +1,5 @@
 import { getDb } from "../server/db";
-import { practices } from "../drizzle/schema";
+import { practices } from "../drizzle/schema_postgres";
 
 const seedPractices = [
   // Focus (Foco)

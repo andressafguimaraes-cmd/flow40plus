@@ -1,6 +1,7 @@
-import { eq, desc, and, gte } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, morningCheckIns, tasks, microSteps, practices, userPracticeProgress, decompositionHistory } from "../drizzle/schema";
+import { eq, desc, and, gte, count } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
+import { InsertUser, users, morningCheckIns, tasks, microSteps, practices, userPracticeProgress, decompositionHistory } from "../drizzle/schema_postgres";
 import { ENV } from './_core/env';
 import { memoryDb } from './db-memory';
 
@@ -8,16 +9,29 @@ let _db: ReturnType<typeof drizzle> | null = null;
 let useMemoryFallback = false;
 
 export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
-    try {
-      _db = drizzle(process.env.DATABASE_URL);
-      useMemoryFallback = false;
-      console.log("[Database] Connected to MySQL");
-    } catch (error) {
-      console.warn("[Database] Failed to connect to MySQL, using in-memory fallback:", error);
-      useMemoryFallback = true;
-      _db = null;
+  if (_db) return _db;
+
+  if (!process.env.DATABASE_URL) {
+    if (ENV.isProduction) {
+      // Fail loudly instead of silently discarding writes in production.
+      throw new Error("DATABASE_URL is required in production");
     }
+    useMemoryFallback = true;
+    return null;
+  }
+
+  try {
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    _db = drizzle(pool);
+    useMemoryFallback = false;
+    console.log("[Database] Connected to Postgres");
+  } catch (error) {
+    if (ENV.isProduction) {
+      throw error;
+    }
+    console.warn("[Database] Failed to connect to Postgres, using in-memory fallback:", error);
+    useMemoryFallback = true;
+    _db = null;
   }
   return _db;
 }
@@ -26,92 +40,80 @@ export function isUsingMemoryFallback() {
   return useMemoryFallback;
 }
 
-export async function upsertUser(user: InsertUser): Promise<void> {
-  if (!user.openId) {
-    throw new Error("User openId is required for upsert");
-  }
-
+export async function getUserByEmail(email: string) {
+  const normalizedEmail = email.trim().toLowerCase();
   const db = await getDb();
   if (!db) {
     if (useMemoryFallback) {
-      const now = new Date();
-      memoryDb.upsertUser({
-        openId: user.openId,
-        name: user.name,
-        email: user.email,
-        loginMethod: user.loginMethod,
-        role: user.role || 'user',
-        createdAt: now,
-        updatedAt: now,
-        lastSignedIn: user.lastSignedIn || now,
-      });
-      return;
-    }
-    console.warn("[Database] Cannot upsert user: database not available");
-    return;
-  }
-
-  try {
-    const values: InsertUser = {
-      openId: user.openId,
-    };
-    const updateSet: Record<string, unknown> = {};
-
-    const textFields = ["name", "email", "loginMethod"] as const;
-    type TextField = (typeof textFields)[number];
-
-    const assignNullable = (field: TextField) => {
-      const value = user[field];
-      if (value === undefined) return;
-      const normalized = value ?? null;
-      values[field] = normalized;
-      updateSet[field] = normalized;
-    };
-
-    textFields.forEach(assignNullable);
-
-    if (user.lastSignedIn !== undefined) {
-      values.lastSignedIn = user.lastSignedIn;
-      updateSet.lastSignedIn = user.lastSignedIn;
-    }
-    if (user.role !== undefined) {
-      values.role = user.role;
-      updateSet.role = user.role;
-    } else if (user.openId === ENV.ownerOpenId) {
-      values.role = 'admin';
-      updateSet.role = 'admin';
-    }
-
-    if (!values.lastSignedIn) {
-      values.lastSignedIn = new Date();
-    }
-
-    if (Object.keys(updateSet).length === 0) {
-      updateSet.lastSignedIn = new Date();
-    }
-
-    await db.insert(users).values(values).onDuplicateKeyUpdate({
-      set: updateSet,
-    });
-  } catch (error) {
-    console.error("[Database] Failed to upsert user:", error);
-    throw error;
-  }
-}
-
-export async function getUserByOpenId(openId: string) {
-  const db = await getDb();
-  if (!db) {
-    if (useMemoryFallback) {
-      return memoryDb.getUserByOpenId(openId);
+      return memoryDb.getUserByEmail(normalizedEmail);
     }
     console.warn("[Database] Cannot get user: database not available");
     return undefined;
   }
 
-  const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
-
+  const result = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1);
   return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getUserById(id: number) {
+  const db = await getDb();
+  if (!db) {
+    if (useMemoryFallback) {
+      return memoryDb.getUserById(id);
+    }
+    console.warn("[Database] Cannot get user: database not available");
+    return undefined;
+  }
+
+  const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function createUser(user: { email: string; name?: string | null; passwordHash?: string | null; loginMethod?: string | null; role?: "user" | "admin" }) {
+  const normalizedEmail = user.email.trim().toLowerCase();
+  const role = user.role ?? (ENV.adminEmail && normalizedEmail === ENV.adminEmail ? "admin" : "user");
+  const now = new Date();
+
+  const db = await getDb();
+  if (!db) {
+    if (useMemoryFallback) {
+      return memoryDb.createUser({
+        email: normalizedEmail,
+        name: user.name ?? null,
+        passwordHash: user.passwordHash ?? null,
+        loginMethod: user.loginMethod ?? null,
+        role,
+        createdAt: now,
+        updatedAt: now,
+        lastSignedIn: now,
+      });
+    }
+    throw new Error("Database not available");
+  }
+
+  const result = await db.insert(users).values({
+    email: normalizedEmail,
+    name: user.name ?? null,
+    passwordHash: user.passwordHash ?? null,
+    loginMethod: user.loginMethod ?? null,
+    role,
+  }).returning();
+
+  return result[0];
+}
+
+export async function updateLastSignedIn(id: number) {
+  const db = await getDb();
+  if (!db) {
+    if (useMemoryFallback) {
+      memoryDb.updateLastSignedIn(id);
+      return;
+    }
+    console.warn("[Database] Cannot update user: database not available");
+    return;
+  }
+
+  await db.update(users).set({ lastSignedIn: new Date() }).where(eq(users.id, id));
 }
 
 // ===== Morning Check-in Functions =====
@@ -131,9 +133,9 @@ export async function createMorningCheckIn(userId: number, sleepQuality: number,
     energyLevel,
     mentalClarity,
     notes,
-  });
+  }).returning({ id: morningCheckIns.id });
 
-  return { insertId: (result as any).insertId || 0 };
+  return { insertId: result[0]?.id ?? 0 };
 }
 
 export async function getWeeklyCheckIns(userId: number) {
@@ -181,13 +183,30 @@ export async function getTodayCheckIn(userId: number) {
   return checkIn.length > 0 ? checkIn[0] : null;
 }
 
-// ===== Task Functions =====
-
-export async function createTask(userId: number, title: string, description?: string, totalEstimatedTime?: number, difficulty?: string) {
+export async function getCheckInCount(userId: number) {
   const db = await getDb();
   if (!db) {
     if (useMemoryFallback) {
-      return memoryDb.createTask(userId, title, description, totalEstimatedTime, difficulty);
+      return memoryDb.getCheckInCount(userId);
+    }
+    throw new Error("Database not available");
+  }
+
+  const result = await db
+    .select({ count: count() })
+    .from(morningCheckIns)
+    .where(eq(morningCheckIns.userId, userId));
+
+  return result[0]?.count ?? 0;
+}
+
+// ===== Task Functions =====
+
+export async function createTask(userId: number, title: string, description?: string, totalEstimatedTime?: number, difficulty?: string, priority?: string) {
+  const db = await getDb();
+  if (!db) {
+    if (useMemoryFallback) {
+      return memoryDb.createTask(userId, title, description, totalEstimatedTime, difficulty, priority);
     }
     throw new Error("Database not available");
   }
@@ -198,9 +217,10 @@ export async function createTask(userId: number, title: string, description?: st
     description,
     totalEstimatedTime,
     difficulty: difficulty as "easy" | "medium" | "hard" | undefined,
-  });
+    priority: (priority ?? "sem") as "urgente" | "alta" | "media" | "baixa" | "sem",
+  }).returning({ id: tasks.id });
 
-  return { insertId: (result as any).insertId || 0 };
+  return { insertId: result[0]?.id ?? 0 };
 }
 
 export async function getUserTasks(userId: number) {
@@ -271,8 +291,8 @@ export async function createMicroSteps(taskId: number, steps: Array<{ title: str
     order: step.order,
   }));
 
-  const result = await db.insert(microSteps).values(stepsToInsert);
-  return { insertId: (result as any).insertId || 0 };
+  const result = await db.insert(microSteps).values(stepsToInsert).returning({ id: microSteps.id });
+  return { insertId: result[0]?.id ?? 0 };
 }
 
 export async function getTaskMicroSteps(taskId: number) {
@@ -303,7 +323,7 @@ export async function updateMicroStepStatus(microStepId: number, completed: bool
     throw new Error("Database not available");
   }
 
-  await db.update(microSteps).set({ completed: completed ? 1 : 0 }).where(eq(microSteps.id, microStepId));
+  await db.update(microSteps).set({ completed }).where(eq(microSteps.id, microStepId));
 }
 
 // ===== Practice Functions =====
@@ -353,9 +373,9 @@ export async function createPractice(title: string, description: string, categor
     category,
     duration,
     instructions,
-  });
+  }).returning({ id: practices.id });
 
-  return { insertId: (result as any).insertId || 0 };
+  return { insertId: result[0]?.id ?? 0 };
 }
 
 export async function logPracticeProgress(userId: number, practiceId: number) {
@@ -365,9 +385,9 @@ export async function logPracticeProgress(userId: number, practiceId: number) {
   const result = await db.insert(userPracticeProgress).values({
     userId,
     practiceId,
-  });
+  }).returning({ id: userPracticeProgress.id });
 
-  return { insertId: (result as any).insertId || 0 };
+  return { insertId: result[0]?.id ?? 0 };
 }
 
 export async function getUserPracticeProgress(userId: number) {
@@ -398,9 +418,9 @@ export async function saveDecompositionHistory(userId: number, originalTask: str
     userId,
     originalTask,
     decomposedData: JSON.stringify(decomposedData),
-  });
+  }).returning({ id: decompositionHistory.id });
 
-  return { insertId: (result as any).insertId || 0 };
+  return { insertId: result[0]?.id ?? 0 };
 }
 
 export async function getUserDecompositionHistory(userId: number) {

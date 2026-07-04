@@ -63,7 +63,7 @@ function AppShell() {
     <div className="min-h-screen bg-[#FDF5E6]">
       <Switch>
         <Route path="/" component={() => { setLocation("/dashboard"); return null; }} />
-        <Route path="/dashboard" component={Dashboard} />
+        <Route path="/dashboard" component={() => <Dashboard onOpenCheckIn={() => setShowCheckIn(true)} />} />
         <Route path="/jornada" component={Jornada} />
         <Route path="/tasks" component={Tasks} />
         <Route path="/calendar" component={Calendar} />

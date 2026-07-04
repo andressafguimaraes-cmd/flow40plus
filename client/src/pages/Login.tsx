@@ -1,25 +1,29 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function Login() {
+  const { login, signup } = useAuth();
+  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleLogin = async () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setLoading(true);
     setError(null);
 
-    try {
-      // Encode the redirect URI to return to dashboard after login
-      const redirectUri = `${window.location.origin}/`;
-      const encodedRedirectUri = btoa(redirectUri);
+    const result =
+      mode === "signup"
+        ? await signup({ name, email, password })
+        : await login({ email, password });
 
-      // Redirect to Manus OAuth login
-      const oauthUrl = `/api/oauth/login?redirect_uri=${encodedRedirectUri}`;
-      window.location.href = oauthUrl;
-    } catch (err) {
-      setError("Erro ao iniciar login. Tente novamente.");
-      setLoading(false);
+    if (!result.success) {
+      setError(result.error);
     }
+    setLoading(false);
   };
 
   return (
@@ -57,61 +61,87 @@ export default function Login() {
         {/* Login Card */}
         <div className="bg-[#FDF5E6] rounded-2xl shadow-2xl p-8">
           <h2 className="text-2xl font-bold text-[#003366] mb-2">
-            Bem-vinda ao Flow 40+
+            {mode === "signup" ? "Crie sua conta" : "Bem-vinda de volta"}
           </h2>
           <p className="text-gray-600 mb-8">
             Organize seu dia com clareza e foco. Comece seu check-up matinal agora.
           </p>
 
-          {/* Benefits */}
-          <div className="space-y-4 mb-8">
-            <div className="flex items-start gap-3">
-              <div className="text-[#E67E22] text-xl mt-1">✓</div>
+          <form onSubmit={handleSubmit} className="space-y-4 mb-4">
+            {mode === "signup" && (
               <div>
-                <p className="font-semibold text-[#003366]">Check-up Matinal</p>
-                <p className="text-sm text-gray-600">
-                  Comece o dia com clareza sobre seu estado
-                </p>
+                <label className="block text-sm font-semibold text-[#003366] mb-1">Nome</label>
+                <input
+                  type="text"
+                  required
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#E67E22]"
+                  placeholder="Seu nome"
+                />
               </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="text-[#2E8B57] text-xl mt-1">✓</div>
-              <div>
-                <p className="font-semibold text-[#003366]">Tarefas Inteligentes</p>
-                <p className="text-sm text-gray-600">
-                  IA decompõe suas tarefas em micro-passos
-                </p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="text-[#003366] text-xl mt-1">✓</div>
-              <div>
-                <p className="font-semibold text-[#003366]">Micro-Práticas</p>
-                <p className="text-sm text-gray-600">
-                  Pausas de recuperação ao longo do dia
-                </p>
-              </div>
-            </div>
-          </div>
+            )}
 
-          {/* Login Button */}
+            <div>
+              <label className="block text-sm font-semibold text-[#003366] mb-1">E-mail</label>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#E67E22]"
+                placeholder="seu@email.com"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-[#003366] mb-1">Senha</label>
+              <input
+                type="password"
+                required
+                minLength={8}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#E67E22]"
+                placeholder="Mínimo 8 caracteres"
+              />
+            </div>
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-[#E67E22] to-[#D65A0F] text-white font-bold py-3 rounded-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading
+                ? "Aguarde..."
+                : mode === "signup"
+                  ? "Criar conta"
+                  : "Entrar"}
+            </button>
+          </form>
+
           <button
-            onClick={handleLogin}
-            disabled={loading}
-            className="w-full bg-gradient-to-r from-[#E67E22] to-[#D65A0F] text-white font-bold py-3 rounded-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed mb-4"
+            type="button"
+            onClick={() => {
+              setMode(mode === "signup" ? "login" : "signup");
+              setError(null);
+            }}
+            className="w-full text-center text-sm text-[#003366] font-semibold hover:underline"
           >
-            {loading ? "Conectando..." : "Entrar com Manus"}
+            {mode === "signup"
+              ? "Já tem conta? Entrar"
+              : "Ainda não tem conta? Cadastre-se"}
           </button>
-
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-              {error}
-            </div>
-          )}
 
           {/* Footer */}
           <p className="text-center text-xs text-gray-500 mt-6">
-            Ao fazer login, você concorda com nossos Termos de Serviço
+            Ao continuar, você concorda com nossos Termos de Serviço
           </p>
         </div>
 

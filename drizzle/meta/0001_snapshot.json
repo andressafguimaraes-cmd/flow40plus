@@ -1,6 +1,6 @@
 {
-  "id": "566be64b-7e7a-4e95-b721-60fb71cc3d66",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "77e7e6b2-4c3f-4c0e-9d45-e37a19e5564f",
+  "prevId": "566be64b-7e7a-4e95-b721-60fb71cc3d66",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -272,6 +272,14 @@
           "primaryKey": false,
           "notNull": false
         },
+        "priority": {
+          "name": "priority",
+          "type": "task_priority",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'sem'"
+        },
         "status": {
           "name": "status",
           "type": "task_status",
@@ -456,6 +464,17 @@
       "values": [
         "user",
         "admin"
+      ]
+    },
+    "public.task_priority": {
+      "name": "task_priority",
+      "schema": "public",
+      "values": [
+        "urgente",
+        "alta",
+        "media",
+        "baixa",
+        "sem"
       ]
     },
     "public.task_status": {

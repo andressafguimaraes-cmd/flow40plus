@@ -39,10 +39,12 @@ export function getSessionCookieOptions(
   //       ? hostname
   //       : undefined;
 
+  // Same-origin app (frontend and API share origin), so "lax" is correct and,
+  // unlike "none", isn't dropped by browsers on plain HTTP local dev.
   return {
     httpOnly: true,
     path: "/",
-    sameSite: "none",
+    sameSite: "lax",
     secure: isSecureRequest(req),
   };
 }

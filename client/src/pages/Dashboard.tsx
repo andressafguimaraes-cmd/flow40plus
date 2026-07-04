@@ -15,10 +15,19 @@ const RECS = [
   { icon: "💪", bg: "#FEF3C7", title: "Fortalecimento Mental", desc: "Exercite sua mente com intenção.", path: "/practices" },
 ];
 
-export default function Dashboard() {
+interface DashboardProps {
+  onOpenCheckIn?: () => void;
+}
+
+export default function Dashboard({ onOpenCheckIn }: DashboardProps) {
   const [, setLocation] = useLocation();
   const { data: todayCheckIn } = trpc.checkIns.getTodayCheckIn.useQuery();
   const { data: weeklyStats } = trpc.checkIns.getWeeklyStats.useQuery();
+
+  const handleOpenCheckIn = () => {
+    localStorage.removeItem("flow40_last_checkin");
+    onOpenCheckIn?.();
+  };
 
   const today = new Date();
   const dayNames = ["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
@@ -98,7 +107,7 @@ export default function Dashboard() {
       ) : (
         <div className="mx-5 mb-4 bg-white rounded-2xl border border-[#E8DFD0] p-4 text-center">
           <p className="text-sm text-[#8E8E93] mb-2">Faça o check-up matinal para ver seus scores</p>
-          <button className="text-xs font-bold text-[#E67E22]" onClick={() => localStorage.removeItem("flow40_last_checkin")}>
+          <button className="text-xs font-bold text-[#E67E22]" onClick={handleOpenCheckIn}>
             Fazer check-up agora →
           </button>
         </div>
@@ -126,7 +135,7 @@ export default function Dashboard() {
       {/* Link discreto de refazer check-in */}
       <div className="text-center pb-4">
         <button
-          onClick={() => localStorage.removeItem("flow40_last_checkin")}
+          onClick={handleOpenCheckIn}
           className="text-xs text-[#8E8E93] underline underline-offset-2">
           ↩ Refazer check-up matinal
         </button>

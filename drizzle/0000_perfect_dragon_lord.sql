@@ -1,3 +1,8 @@
+CREATE TYPE "public"."category" AS ENUM('focus', 'relief', 'inspiration');--> statement-breakpoint
+CREATE TYPE "public"."difficulty" AS ENUM('easy', 'medium', 'hard');--> statement-breakpoint
+CREATE TYPE "public"."micro_difficulty" AS ENUM('easy', 'medium', 'hard');--> statement-breakpoint
+CREATE TYPE "public"."role" AS ENUM('user', 'admin');--> statement-breakpoint
+CREATE TYPE "public"."task_status" AS ENUM('pending', 'in_progress', 'completed');--> statement-breakpoint
 CREATE TABLE "decomposition_history" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"user_id" integer NOT NULL,
@@ -59,13 +64,13 @@ CREATE TABLE "user_practice_progress" (
 --> statement-breakpoint
 CREATE TABLE "users" (
 	"id" serial PRIMARY KEY NOT NULL,
-	"openId" varchar(64) NOT NULL,
+	"email" varchar(320) NOT NULL,
+	"password_hash" varchar(255),
 	"name" text,
-	"email" varchar(320),
 	"loginMethod" varchar(64),
 	"role" "role" DEFAULT 'user' NOT NULL,
 	"createdAt" timestamp DEFAULT now() NOT NULL,
 	"updatedAt" timestamp DEFAULT now() NOT NULL,
 	"lastSignedIn" timestamp DEFAULT now() NOT NULL,
-	CONSTRAINT "users_openId_unique" UNIQUE("openId")
+	CONSTRAINT "users_email_unique" UNIQUE("email")
 );

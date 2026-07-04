@@ -1,6 +1,8 @@
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import AppHeader from "@/components/AppHeader";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+import { trpc } from "@/lib/trpc";
 
 const PAUSE_ALERTS = [
   { id: "manha", label: "🌿 Pausa da Manhã", defaultTime: "10:00", msg: "Hora de respirar e recarregar ☀️" },
@@ -9,9 +11,14 @@ const PAUSE_ALERTS = [
 ];
 
 export default function Perfil() {
+  const { user, logout } = useAuth();
+  const { data: checkInTotal } = trpc.checkIns.getTotalCount.useQuery();
+  const { data: userTasks } = trpc.tasks.list.useQuery();
+  const { data: practiceProgress } = trpc.practices.getUserProgress.useQuery();
+
   const [photo, setPhoto] = useState<string | null>(null);
-  const [name, setName] = useState("Ana");
-  const [email, setEmail] = useState("ana@email.com");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [editingProfile, setEditingProfile] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
@@ -21,6 +28,22 @@ export default function Perfil() {
   );
   const [checkInAlert, setCheckInAlert] = useState({ enabled: true, time: "07:30" });
   const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (user) {
+      setName(user.name ?? "");
+      setEmail(user.email ?? "");
+    }
+  }, [user]);
+
+  const completedTasksCount = userTasks?.filter(t => t.status === "completed").length;
+  const practicesCount = practiceProgress?.length;
+
+  const STATS = [
+    { label: "Check-ups", value: checkInTotal !== undefined ? String(checkInTotal.count) : "—", icon: "☀️" },
+    { label: "Tarefas", value: completedTasksCount !== undefined ? String(completedTasksCount) : "—", icon: "✅" },
+    { label: "Práticas", value: practicesCount !== undefined ? String(practicesCount) : "—", icon: "🌿" },
+  ];
 
   const handlePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -36,7 +59,7 @@ export default function Perfil() {
     { icon: "🌙", label: "Tema escuro", action: () => { setDarkMode(!darkMode); toast.success(darkMode ? "Tema claro ativado" : "Tema escuro ativado"); }, toggle: darkMode },
     { icon: "❓", label: "Ajuda e FAQ", action: () => setShowHelp(true) },
     { icon: "⭐", label: "Avaliar o app", action: () => toast.success("Obrigada pelo seu feedback! 💛") },
-    { icon: "🚪", label: "Sair", action: () => toast.info("Sessão encerrada"), danger: true },
+    { icon: "🚪", label: "Sair", action: () => { logout(); toast.info("Sessão encerrada"); }, danger: true },
   ];
 
   return (
@@ -61,11 +84,7 @@ export default function Perfil() {
 
       {/* Stats rápidas */}
       <div className="grid grid-cols-3 gap-3 px-5 mb-5">
-        {[
-          { label: "Check-ups", value: "12", icon: "☀️" },
-          { label: "Tarefas", value: "34", icon: "✅" },
-          { label: "Práticas", value: "8", icon: "🌿" },
-        ].map(s => (
+        {STATS.map(s => (
           <div key={s.label} className="bg-white rounded-2xl border border-[#E8DFD0] p-3 text-center">
             <div className="text-xl mb-1">{s.icon}</div>
             <div className="text-xl font-black text-[#E67E22]">{s.value}</div>

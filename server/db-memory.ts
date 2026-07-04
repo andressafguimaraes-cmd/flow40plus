@@ -5,10 +5,10 @@
 
 interface StoredUser {
   id: number;
-  openId: string;
-  name?: string;
-  email?: string;
-  loginMethod?: string;
+  email: string;
+  passwordHash: string | null;
+  name: string | null;
+  loginMethod: string | null;
   role: 'user' | 'admin';
   createdAt: Date;
   updatedAt: Date;
@@ -32,6 +32,7 @@ interface StoredTask {
   description?: string;
   totalEstimatedTime?: number;
   difficulty?: 'easy' | 'medium' | 'hard';
+  priority?: 'urgente' | 'alta' | 'media' | 'baixa' | 'sem';
   status: 'pending' | 'in_progress' | 'completed';
   createdAt: Date;
   updatedAt: Date;
@@ -44,7 +45,7 @@ interface StoredMicroStep {
   description?: string;
   estimatedTime: number;
   difficulty?: 'easy' | 'medium' | 'hard';
-  completed: number;
+  completed: boolean;
   order: number;
   createdAt: Date;
 }
@@ -83,18 +84,26 @@ class InMemoryDatabase {
   private decompositionIdCounter = 1;
 
   // Users
-  upsertUser(user: Omit<StoredUser, 'id'>) {
-    const existing = Array.from(this.users.values()).find(u => u.openId === user.openId);
-    if (existing) {
-      Object.assign(existing, user);
-      return;
-    }
+  createUser(user: Omit<StoredUser, 'id'>) {
     const id = this.userIdCounter++;
-    this.users.set(id, { ...user, id });
+    const stored = { ...user, id };
+    this.users.set(id, stored);
+    return stored;
   }
 
-  getUserByOpenId(openId: string) {
-    return Array.from(this.users.values()).find(u => u.openId === openId);
+  getUserByEmail(email: string) {
+    return Array.from(this.users.values()).find(u => u.email === email);
+  }
+
+  getUserById(id: number) {
+    return this.users.get(id);
+  }
+
+  updateLastSignedIn(id: number) {
+    const user = this.users.get(id);
+    if (user) {
+      user.lastSignedIn = new Date();
+    }
   }
 
   // Check-ins
@@ -121,6 +130,10 @@ class InMemoryDatabase {
     ) || null;
   }
 
+  getCheckInCount(userId: number) {
+    return Array.from(this.checkIns.values()).filter(c => c.userId === userId).length;
+  }
+
   getWeeklyCheckIns(userId: number) {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -130,7 +143,7 @@ class InMemoryDatabase {
   }
 
   // Tasks
-  createTask(userId: number, title: string, description?: string, totalEstimatedTime?: number, difficulty?: string) {
+  createTask(userId: number, title: string, description?: string, totalEstimatedTime?: number, difficulty?: string, priority?: string) {
     const id = this.taskIdCounter++;
     const task: StoredTask = {
       id,
@@ -139,6 +152,7 @@ class InMemoryDatabase {
       description,
       totalEstimatedTime,
       difficulty: difficulty as 'easy' | 'medium' | 'hard' | undefined,
+      priority: (priority ?? 'sem') as 'urgente' | 'alta' | 'media' | 'baixa' | 'sem',
       status: 'pending',
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -185,7 +199,7 @@ class InMemoryDatabase {
         description: step.description,
         estimatedTime: step.estimatedTime,
         difficulty: step.difficulty as 'easy' | 'medium' | 'hard',
-        completed: 0,
+        completed: false,
         order: step.order,
         createdAt: new Date(),
       };
@@ -204,7 +218,7 @@ class InMemoryDatabase {
   updateMicroStepStatus(microStepId: number, completed: boolean) {
     const step = this.microSteps.get(microStepId);
     if (step) {
-      step.completed = completed ? 1 : 0;
+      step.completed = completed;
     }
   }
 

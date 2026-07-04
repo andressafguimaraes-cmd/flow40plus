@@ -1,63 +1,97 @@
-import { useEffect, useState } from "react";
-import { trpc } from "@/utils/trpc";
-
-export interface User {
-  id: number;
-  openId: string;
-  name: string | null;
-  email: string | null;
-  loginMethod: string | null;
-  role: string;
-  createdAt: Date;
-  updatedAt: Date;
-  lastSignedIn: Date;
-}
+import { trpc } from "@/lib/trpc";
+import { TRPCClientError } from "@trpc/client";
+import { useCallback, useMemo } from "react";
 
 export function useAuth() {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const utils = trpc.useUtils();
 
-  // Fetch current user on mount
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        setLoading(true);
-        // Try to get user from session - if it fails, user is not authenticated
-        const response = await fetch("/api/trpc/user.me?input={}", {
-          method: "GET",
-          credentials: "include",
-        });
+  const meQuery = trpc.auth.me.useQuery(undefined, {
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
 
-        if (response.ok) {
-          const data = await response.json();
-          if (data.result?.data) {
-            setUser(data.result.data);
-          }
-        }
-      } catch (err) {
-        // User not authenticated
-        setUser(null);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const signupMutation = trpc.auth.signup.useMutation({
+    onSuccess: user => utils.auth.me.setData(undefined, user),
+  });
 
-    fetchUser();
-  }, []);
+  const loginMutation = trpc.auth.login.useMutation({
+    onSuccess: user => utils.auth.me.setData(undefined, user),
+  });
 
-  const logout = async () => {
-    try {
-      await fetch("/api/oauth/logout", {
-        method: "POST",
-        credentials: "include",
-      });
-      setUser(null);
-      window.location.href = "/";
-    } catch (err) {
-      setError("Erro ao fazer logout");
-    }
+  const logoutMutation = trpc.auth.logout.useMutation({
+    onSuccess: () => utils.auth.me.setData(undefined, null),
+  });
+
+  const extractErrorMessage = (error: unknown, fallback: string) => {
+    if (error instanceof TRPCClientError) return error.message;
+    return fallback;
   };
 
-  return { user, loading, error, logout, isAuthenticated: !!user };
+  const signup = useCallback(
+    async (input: { name: string; email: string; password: string }) => {
+      try {
+        await signupMutation.mutateAsync(input);
+        return { success: true as const };
+      } catch (error) {
+        return { success: false as const, error: extractErrorMessage(error, "Erro ao criar conta. Tente novamente.") };
+      }
+    },
+    [signupMutation]
+  );
+
+  const login = useCallback(
+    async (input: { email: string; password: string }) => {
+      try {
+        await loginMutation.mutateAsync(input);
+        return { success: true as const };
+      } catch (error) {
+        return { success: false as const, error: extractErrorMessage(error, "Erro ao entrar. Tente novamente.") };
+      }
+    },
+    [loginMutation]
+  );
+
+  const logout = useCallback(async () => {
+    try {
+      await logoutMutation.mutateAsync();
+    } catch (error) {
+      if (error instanceof TRPCClientError && error.data?.code === "UNAUTHORIZED") {
+        return;
+      }
+      throw error;
+    } finally {
+      utils.auth.me.setData(undefined, null);
+      await utils.auth.me.invalidate();
+    }
+  }, [logoutMutation, utils]);
+
+  const state = useMemo(
+    () => ({
+      user: meQuery.data ?? null,
+      loading:
+        meQuery.isLoading ||
+        signupMutation.isPending ||
+        loginMutation.isPending ||
+        logoutMutation.isPending,
+      error: meQuery.error ?? signupMutation.error ?? loginMutation.error ?? null,
+      isAuthenticated: Boolean(meQuery.data),
+    }),
+    [
+      meQuery.data,
+      meQuery.error,
+      meQuery.isLoading,
+      signupMutation.isPending,
+      signupMutation.error,
+      loginMutation.isPending,
+      loginMutation.error,
+      logoutMutation.isPending,
+    ]
+  );
+
+  return {
+    ...state,
+    signup,
+    login,
+    logout,
+  };
 }

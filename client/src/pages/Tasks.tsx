@@ -11,9 +11,11 @@ const PRIORITIES = [
   { key: "sem",     label: "⚪ Sem prioridade", color: "#8E8E93", bg: "#F5F5F5", border: "#E0E0E0" },
 ];
 
+type TaskPriority = "urgente" | "alta" | "media" | "baixa" | "sem";
+
 interface MicroStep { title: string; description: string; estimatedTime: number; difficulty: string; }
 interface TaskItem {
-  id: number; title: string; priority: string; estimatedTime?: number;
+  id: number; title: string; priority?: TaskPriority | null; totalEstimatedTime?: number | null;
   status: string; steps: { id: number; title: string; completed: boolean; estimatedTime?: number }[];
   progress: number;
 }
@@ -21,7 +23,7 @@ interface TaskItem {
 export default function Tasks() {
   const [taskInput, setTaskInput] = useState("");
   const [timeInput, setTimeInput] = useState("");
-  const [priority, setPriority] = useState("sem");
+  const [priority, setPriority] = useState<TaskPriority>("sem");
   const [filter, setFilter] = useState("todas");
   const [decomposing, setDecomposing] = useState(false);
   const [showPriorityModal, setShowPriorityModal] = useState(false);
@@ -42,7 +44,11 @@ export default function Tasks() {
   const handleDecompose = () => {
     if (!taskInput.trim()) return;
     setDecomposing(true);
-    decomposeMutation.mutate({ taskDescription: taskInput.trim(), context: `Prioridade: ${priority}. Tempo estimado: ${timeInput || "não informado"}` });
+    decomposeMutation.mutate({
+      taskDescription: taskInput.trim(),
+      context: timeInput ? `Tempo estimado: ${timeInput}` : "",
+      priority,
+    });
   };
 
   const handleVoice = () => {
@@ -59,7 +65,7 @@ export default function Tasks() {
       toast.success("Voz capturada! Decompondo com IA...");
       setTimeout(() => {
         setDecomposing(true);
-        decomposeMutation.mutate({ taskDescription: text, context: `Prioridade: ${priority}` });
+        decomposeMutation.mutate({ taskDescription: text, priority });
       }, 500);
     };
     recognition.onerror = () => toast.error("Erro no reconhecimento de voz.");
@@ -68,11 +74,11 @@ export default function Tasks() {
   };
 
   const grouped = PRIORITIES.reduce((acc, p) => {
-    acc[p.key] = (tasks ?? []).filter(t => (t as any).priority === p.key || (!((t as any).priority) && p.key === "sem"));
+    acc[p.key] = (tasks ?? []).filter(t => t.priority === p.key || (!t.priority && p.key === "sem"));
     return acc;
   }, {} as Record<string, TaskItem[]>);
 
-  const totalMinutes = (tasks ?? []).filter(t => t.status !== "completed").reduce((s, t) => s + ((t as any).estimatedTime ?? 0), 0);
+  const totalMinutes = (tasks ?? []).filter(t => t.status !== "completed").reduce((s, t) => s + (t.totalEstimatedTime ?? 0), 0);
   const totalH = Math.floor(totalMinutes / 60);
   const totalM = totalMinutes % 60;
 
@@ -132,7 +138,7 @@ export default function Tasks() {
       {PRIORITIES.filter(p => filter === "todas" || filter === p.key).map(p => {
         const blockTasks = grouped[p.key] ?? [];
         if (blockTasks.length === 0 && filter !== "todas") return null;
-        const blockMinutes = blockTasks.reduce((s, t) => s + ((t as any).estimatedTime ?? 0), 0);
+        const blockMinutes = blockTasks.reduce((s, t) => s + (t.totalEstimatedTime ?? 0), 0);
         const bH = Math.floor(blockMinutes / 60), bM = blockMinutes % 60;
         const isExpanded = expandedBlocks[p.key] !== false;
         return (
@@ -160,8 +166,8 @@ export default function Tasks() {
                       {task.title}
                     </span>
                   )}
-                  {(task as any).estimatedTime > 0 && (
-                    <span className="text-[10px] text-[#8E8E93] flex-shrink-0">⏱ {(task as any).estimatedTime}min</span>
+                  {!!task.totalEstimatedTime && task.totalEstimatedTime > 0 && (
+                    <span className="text-[10px] text-[#8E8E93] flex-shrink-0">⏱ {task.totalEstimatedTime}min</span>
                   )}
                   <button onClick={() => setExpandedTasks(prev => ({ ...prev, [task.id]: !prev[task.id] }))}
                     className="text-xs text-[#8E8E93] flex-shrink-0">
@@ -201,7 +207,7 @@ export default function Tasks() {
             <div className="w-10 h-1 rounded-full bg-[#E8DFD0] mx-auto mb-4" />
             <h3 className="text-base font-black text-[#1C1C1E] mb-3">Definir prioridade</h3>
             {PRIORITIES.map(p => (
-              <button key={p.key} onClick={() => { setPriority(p.key); setShowPriorityModal(false); }}
+              <button key={p.key} onClick={() => { setPriority(p.key as TaskPriority); setShowPriorityModal(false); }}
                 className="w-full flex items-center gap-3 p-3 rounded-xl mb-2 text-left transition-all"
                 style={{ background: priority === p.key ? p.bg : "transparent", border: `1.5px solid ${priority === p.key ? p.border : "#E8DFD0"}` }}>
                 <span className="text-lg">{p.label.split(" ")[0]}</span>

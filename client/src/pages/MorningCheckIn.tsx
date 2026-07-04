@@ -59,6 +59,7 @@ interface MorningCheckInProps {
 
 export default function MorningCheckIn({ onClose, onComplete }: MorningCheckInProps) {
   const [, setLocation] = useLocation();
+  const utils = trpc.useUtils();
   const [sleep, setSleep] = useState(5);
   const [energy, setEnergy] = useState(5);
   const [clarity, setClarity] = useState(5);
@@ -69,6 +70,8 @@ export default function MorningCheckIn({ onClose, onComplete }: MorningCheckInPr
 
   const createCheckIn = trpc.checkIns.create.useMutation({
     onSuccess: () => {
+      utils.checkIns.getTodayCheckIn.invalidate();
+      utils.checkIns.getWeeklyStats.invalidate();
       toast.success("Check-up registrado! Bom dia 🌅");
       if (onComplete) onComplete();
       else setLocation("/dashboard");

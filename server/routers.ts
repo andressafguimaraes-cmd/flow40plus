@@ -1,5 +1,8 @@
-import { COOKIE_NAME } from "@shared/const";
+import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { TRPCError } from "@trpc/server";
 import { getSessionCookieOptions } from "./_core/cookies";
+import { hashPassword, verifyPassword } from "./_core/password";
+import { auth } from "./_core/sdk";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { z } from "zod";
@@ -7,13 +10,70 @@ import * as db from "./db";
 import { invokeLLM, type InvokeResult } from "./_core/llm";
 import { getGoogleAuthUrl, getTokensFromCode, exportTaskToCalendar, createFlowCalendar, getCalendarList } from "./services/googleCalendar";
 import * as googleCalendarDb from "./db-google-calendar";
+import type { User } from "../drizzle/schema_postgres";
+import type { TrpcContext } from "./_core/context";
 
-const COOKIE_NAME = "session";
+// Never send the password hash to the client.
+function toSafeUser(user: User) {
+  const { passwordHash, ...safeUser } = user;
+  return safeUser;
+}
+
+async function createSessionCookie(userId: number, ctx: Pick<TrpcContext, "req" | "res">) {
+  const sessionToken = await auth.signSession({ userId });
+  const cookieOptions = getSessionCookieOptions(ctx.req);
+  ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+}
 
 export const appRouter = router({
   system: systemRouter,
   auth: router({
-    me: publicProcedure.query(opts => opts.ctx.user),
+    me: publicProcedure.query(opts => (opts.ctx.user ? toSafeUser(opts.ctx.user) : null)),
+
+    signup: publicProcedure
+      .input(z.object({
+        name: z.string().trim().min(1, "Nome é obrigatório").max(100),
+        email: z.string().trim().toLowerCase().email("E-mail inválido"),
+        password: z.string().min(8, "A senha precisa ter pelo menos 8 caracteres"),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const existing = await db.getUserByEmail(input.email);
+        if (existing) {
+          throw new TRPCError({ code: "CONFLICT", message: "Este e-mail já está cadastrado." });
+        }
+
+        const passwordHash = await hashPassword(input.password);
+        const user = await db.createUser({
+          email: input.email,
+          name: input.name,
+          passwordHash,
+          loginMethod: "email",
+        });
+
+        await createSessionCookie(user.id, ctx);
+        return toSafeUser(user);
+      }),
+
+    login: publicProcedure
+      .input(z.object({
+        email: z.string().trim().toLowerCase().email("E-mail inválido"),
+        password: z.string().min(1, "Senha é obrigatória"),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const user = await db.getUserByEmail(input.email);
+        const passwordMatches = user?.passwordHash
+          ? await verifyPassword(input.password, user.passwordHash)
+          : false;
+
+        if (!user || !passwordMatches) {
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "E-mail ou senha incorretos." });
+        }
+
+        await db.updateLastSignedIn(user.id);
+        await createSessionCookie(user.id, ctx);
+        return toSafeUser(user);
+      }),
+
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
@@ -63,6 +123,19 @@ export const appRouter = router({
           return checkIn;
         } catch (error) {
           return null;
+        }
+      }),
+
+    getTotalCount: publicProcedure
+      .query(async ({ ctx }) => {
+        if (!ctx.user) {
+          throw new Error("User not authenticated");
+        }
+        try {
+          const count = await db.getCheckInCount(ctx.user.id);
+          return { count };
+        } catch (error) {
+          return { count: 0 };
         }
       }),
 
@@ -120,6 +193,7 @@ export const appRouter = router({
       .input(z.object({
         taskDescription: z.string().min(5).max(500),
         context: z.string().optional().default(""),
+        priority: z.enum(["urgente", "alta", "media", "baixa", "sem"]).optional().default("sem"),
       }))
       .mutation(async ({ ctx, input }) => {
         try {
@@ -128,9 +202,9 @@ export const appRouter = router({
 Task: ${input.taskDescription}
 ${input.context ? `Context: ${input.context}` : ""}
 
-Please decompose this task into 5-10 specific, actionable micro-steps. For each step, provide:
-1. A clear title
-2. A brief description
+Decompose this task into AT MOST 6 specific, actionable micro-steps (fewer is fine for simple tasks). Keep titles short and descriptions direct — one concise sentence each. Respond in the SAME language as the task above. For each step, provide:
+1. A short, clear title
+2. A brief, direct description (max 1 sentence)
 3. Estimated time in minutes (be realistic for women 40+ who may have energy fluctuations)
 4. Difficulty level (easy, medium, hard)
 
@@ -146,14 +220,19 @@ Return the response as a JSON object with this structure:
   ],
   "totalEstimatedTime": 120,
   "overallDifficulty": "medium"
-}`;
+}
+
+IMPORTANT: Respond ONLY with valid JSON. No markdown. No explanation. No extra text.
+`;
 
           const response = await invokeLLM({
+            model: "gemini-2.5-flash-lite",
+            reasoningEffort: "none",
             messages: [{
               role: "user",
               content: prompt,
             }],
-            maxTokens: 1500,
+            maxTokens: 2000,
           });
 
           // Extract the text content from the response
@@ -165,9 +244,14 @@ Return the response as a JSON object with this structure:
           // Parse the response with validation
           let decomposition;
           try {
-            decomposition = JSON.parse(responseText);
+            const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+if (!jsonMatch) {
+  throw new Error("No JSON found in response");
+}
+decomposition = JSON.parse(jsonMatch[0]);
           } catch (e) {
             // Try to extract JSON from the response
+console.log("RAW AI RESPONSE:", responseText);
             const jsonMatch = responseText.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
               try {
@@ -205,7 +289,8 @@ Return the response as a JSON object with this structure:
               input.taskDescription,
               input.context,
               decomposition.totalEstimatedTime,
-              decomposition.overallDifficulty
+              decomposition.overallDifficulty,
+              input.priority
             );
           } catch (dbError) {
             console.error("Database error creating task:", dbError);
