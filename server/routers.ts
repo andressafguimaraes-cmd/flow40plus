@@ -87,9 +87,9 @@ export const appRouter = router({
   checkIns: router({
     create: publicProcedure
       .input(z.object({
-        sleepQuality: z.number().min(1).max(10),
-        energyLevel: z.number().min(1).max(10),
-        mentalClarity: z.number().min(1).max(10),
+        sleepQuality: z.number().min(1).max(5),
+        energyLevel: z.number().min(1).max(5),
+        mentalClarity: z.number().min(1).max(5),
         notes: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {

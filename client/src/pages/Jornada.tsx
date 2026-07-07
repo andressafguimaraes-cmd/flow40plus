@@ -24,9 +24,9 @@ export default function Jornada() {
   const { data: weeklyStats } = trpc.checkIns.getWeeklyStats.useQuery();
   const { data: tasks } = trpc.tasks.list.useQuery();
 
-  // Dados fictícios para demo (serão substituídos por dados reais)
-  const sleepData = [6, 7, 5, 8, 7, 6, 8];
-  const energyData = [5, 7, 4, 8, 6, 7, 9];
+  // Dados fictícios para demo (serão substituídos por dados reais) — escala 1-5
+  const sleepData = [3, 4, 2, 5, 4, 3, 4];
+  const energyData = [3, 4, 2, 4, 3, 4, 5];
   const tasksPerDay = [3, 5, 2, 4, 3, 6, 2];
 
   const completedTasks = tasks?.filter(t => t.status === "completed").length ?? 0;
@@ -51,7 +51,7 @@ export default function Jornada() {
           <div key={label} className="bg-white rounded-2xl border border-[#E8DFD0] p-3 text-center">
             <div className="text-xl mb-1">{icon}</div>
             <div className="text-xl font-black" style={{ color }}>{value}</div>
-            <div className="text-[9px] text-[#8E8E93]">/10 média</div>
+            <div className="text-[9px] text-[#8E8E93]">/5 média</div>
             <div className="text-[10px] text-[#8E8E93] mt-0.5">{label}</div>
           </div>
         ))}
@@ -68,8 +68,8 @@ export default function Jornada() {
           {DAYS.map((day, i) => (
             <div key={day} className="flex-1 flex flex-col items-center gap-0.5">
               <div className="w-full flex gap-0.5 items-end" style={{ height: 52 }}>
-                <div className="flex-1 rounded-t-sm" style={{ height: `${(sleepData[i] / 10) * 52}px`, background: "#7B6FA0" }} />
-                <div className="flex-1 rounded-t-sm" style={{ height: `${(energyData[i] / 10) * 52}px`, background: "#E67E22" }} />
+                <div className="flex-1 rounded-t-sm" style={{ height: `${(sleepData[i] / 5) * 52}px`, background: "#7B6FA0" }} />
+                <div className="flex-1 rounded-t-sm" style={{ height: `${(energyData[i] / 5) * 52}px`, background: "#E67E22" }} />
               </div>
               <span className="text-[9px] text-[#8E8E93]">{day}</span>
             </div>

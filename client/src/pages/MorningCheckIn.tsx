@@ -16,7 +16,7 @@ interface MetricSliderProps {
 }
 
 function MetricSlider({ label, icon, color, bgColor, minLabel, maxLabel, value, onChange, badges }: MetricSliderProps) {
-  const pct = ((value - 1) / 9) * 100;
+  const pct = ((value - 1) / 4) * 100;
   return (
     <div className="bg-white rounded-2xl border border-[#E8DFD0] p-4 mb-3">
       <div className="flex items-center justify-between mb-3">
@@ -27,14 +27,14 @@ function MetricSlider({ label, icon, color, bgColor, minLabel, maxLabel, value, 
           <span className="font-bold text-[#1C1C1E] text-sm">{label}</span>
         </div>
         <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: bgColor, color }}>
-          {value}/10 · {badges[Math.floor((value - 1) / 2)]}
+          {value}/5 · {badges[value - 1]}
         </span>
       </div>
       <div className="flex items-center gap-2 mb-1">
         <span className="text-[10px] text-[#8E8E93] w-16 text-left">{minLabel}</span>
         <div className="flex-1 relative">
           <input
-            type="range" min={1} max={10} value={value}
+            type="range" min={1} max={5} value={value}
             onChange={e => onChange(Number(e.target.value))}
             className="w-full h-1.5 rounded-full appearance-none cursor-pointer outline-none"
             style={{ background: `linear-gradient(to right, ${color} ${pct}%, #E8DFD0 ${pct}%)` }}
@@ -43,7 +43,7 @@ function MetricSlider({ label, icon, color, bgColor, minLabel, maxLabel, value, 
         <span className="text-[10px] text-[#8E8E93] w-16 text-right">{maxLabel}</span>
       </div>
       <div className="flex justify-center gap-1 mt-2">
-        {[1,2,3,4,5,6,7,8,9,10].map(i => (
+        {[1,2,3,4,5].map(i => (
           <div key={i} className="flex-1 h-1 rounded-full transition-all"
                style={{ background: i <= value ? color : "#E8DFD0" }} />
         ))}
@@ -60,9 +60,9 @@ interface MorningCheckInProps {
 export default function MorningCheckIn({ onClose, onComplete }: MorningCheckInProps) {
   const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
-  const [sleep, setSleep] = useState(5);
-  const [energy, setEnergy] = useState(5);
-  const [clarity, setClarity] = useState(5);
+  const [sleep, setSleep] = useState(3);
+  const [energy, setEnergy] = useState(3);
+  const [clarity, setClarity] = useState(3);
   const [notes, setNotes] = useState("");
   const [alertTime, setAlertTime] = useState("07:30");
   const [showTimeEdit, setShowTimeEdit] = useState(false);

@@ -3,23 +3,13 @@ import { useLocation } from "wouter";
 const tabs = [
   {
     path: "/dashboard",
-    label: "Dashboard",
+    label: "Início",
     icon: (active: boolean) => (
       <svg viewBox="0 0 24 24" fill={active ? "#E67E22" : "none"} stroke={active ? "#E67E22" : "#8E8E93"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect x="3" y="3" width="7" height="7" rx="1"/>
         <rect x="14" y="3" width="7" height="7" rx="1"/>
         <rect x="3" y="14" width="7" height="7" rx="1"/>
         <rect x="14" y="14" width="7" height="7" rx="1"/>
-      </svg>
-    ),
-  },
-  {
-    path: "/jornada",
-    label: "Jornada",
-    icon: (active: boolean) => (
-      <svg viewBox="0 0 24 24" fill="none" stroke={active ? "#E67E22" : "#8E8E93"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/>
-        <path d="M12 6v6l4 2"/>
       </svg>
     ),
   },
@@ -34,8 +24,8 @@ const tabs = [
     ),
   },
   {
-    path: "/calendar",
-    label: "Calendário",
+    path: "/planejamento",
+    label: "Planejamento",
     icon: (active: boolean) => (
       <svg viewBox="0 0 24 24" fill="none" stroke={active ? "#E67E22" : "#8E8E93"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
@@ -46,13 +36,12 @@ const tabs = [
     ),
   },
   {
-    path: "/practices",
-    label: "Práticas",
+    path: "/jornada",
+    label: "Jornada",
     icon: (active: boolean) => (
       <svg viewBox="0 0 24 24" fill="none" stroke={active ? "#E67E22" : "#8E8E93"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 22c-4.97 0-9-4.03-9-9 0-3.03 1.5-5.71 3.8-7.35"/>
-        <path d="M12 2c4.97 0 9 4.03 9 9 0 3.03-1.5 5.71-3.8 7.35"/>
-        <circle cx="12" cy="13" r="3"/>
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/>
+        <path d="M12 6v6l4 2"/>
       </svg>
     ),
   },

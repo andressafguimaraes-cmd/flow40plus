@@ -36,10 +36,10 @@ export default function Dashboard({ onOpenCheckIn }: DashboardProps) {
 
   const insight = INSIGHTS[today.getDate() % INSIGHTS.length];
 
-  // Scores /100 baseados nos dados do check-in ou médias semanais
-  const sleepScore = todayCheckIn ? Math.round(todayCheckIn.sleepQuality * 10) : (weeklyStats ? Math.round(weeklyStats.averageSleep * 10) : 0);
-  const energyScore = todayCheckIn ? Math.round(todayCheckIn.energyLevel * 10) : (weeklyStats ? Math.round(weeklyStats.averageEnergy * 10) : 0);
-  const clarityScore = todayCheckIn ? Math.round(todayCheckIn.mentalClarity * 10) : (weeklyStats ? Math.round(weeklyStats.averageClarity * 10) : 0);
+  // Scores /100 baseados nos dados do check-in (escala 1-5) ou médias semanais
+  const sleepScore = todayCheckIn ? Math.round(todayCheckIn.sleepQuality * 20) : (weeklyStats ? Math.round(weeklyStats.averageSleep * 20) : 0);
+  const energyScore = todayCheckIn ? Math.round(todayCheckIn.energyLevel * 20) : (weeklyStats ? Math.round(weeklyStats.averageEnergy * 20) : 0);
+  const clarityScore = todayCheckIn ? Math.round(todayCheckIn.mentalClarity * 20) : (weeklyStats ? Math.round(weeklyStats.averageClarity * 20) : 0);
 
   const getScoreColor = (score: number) => {
     if (score >= 70) return "#2E8B57";

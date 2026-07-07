@@ -1,20 +1,19 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import BottomNav from "./components/BottomNav";
+import SwipeableTabs, { TAB_ORDER } from "./components/SwipeableTabs";
 import MorningCheckIn from "./pages/MorningCheckIn";
-import Dashboard from "./pages/Dashboard";
-import Tasks from "./pages/Tasks";
 import Practices from "./pages/Practices";
-import Jornada from "./pages/Jornada";
-import Perfil from "./pages/Perfil";
 import Calendar from "./pages/Calendar";
 import { useState, useEffect } from "react";
 import Login from "@/pages/Login";
 import { useAuth } from "@/hooks/useAuth";
+
+const LEGACY_ROUTES = ["/calendar", "/practices"];
 
 function AppShell() {
   const [location, setLocation] = useLocation();
@@ -29,6 +28,11 @@ function AppShell() {
       setTimeout(() => setShowCheckIn(true), 800);
     }
   }, []);
+
+  // Rota raiz sempre cai no Dashboard
+  useEffect(() => {
+    if (location === "/") setLocation("/dashboard");
+  }, [location, setLocation]);
 
   const handleCheckInComplete = () => {
     const today = new Date().toDateString();
@@ -59,19 +63,21 @@ function AppShell() {
     return <Login />;
   }
 
+  const isTabRoute = location === "/" || (TAB_ORDER as readonly string[]).includes(location);
+  const isLegacyRoute = LEGACY_ROUTES.includes(location);
+
   return (
     <div className="min-h-screen bg-[#FDF5E6]">
-      <Switch>
-        <Route path="/" component={() => { setLocation("/dashboard"); return null; }} />
-        <Route path="/dashboard" component={() => <Dashboard onOpenCheckIn={() => setShowCheckIn(true)} />} />
-        <Route path="/jornada" component={Jornada} />
-        <Route path="/tasks" component={Tasks} />
-        <Route path="/calendar" component={Calendar} />
-        <Route path="/practices" component={Practices} />
-        <Route path="/perfil" component={Perfil} />
-        <Route path="/404" component={NotFound} />
-        <Route component={NotFound} />
-      </Switch>
+      {isTabRoute && (
+        <SwipeableTabs
+          location={location === "/" ? "/dashboard" : location}
+          onNavigate={setLocation}
+          onOpenCheckIn={() => setShowCheckIn(true)}
+        />
+      )}
+      {location === "/calendar" && <Calendar />}
+      {location === "/practices" && <Practices />}
+      {!isTabRoute && !isLegacyRoute && <NotFound />}
 
       <BottomNav />
 
