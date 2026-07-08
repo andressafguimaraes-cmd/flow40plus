@@ -34,6 +34,7 @@ interface StoredTask {
   difficulty?: 'easy' | 'medium' | 'hard';
   priority?: 'urgente' | 'alta' | 'media' | 'baixa' | 'sem';
   status: 'pending' | 'in_progress' | 'completed';
+  scheduledTime?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -154,6 +155,7 @@ class InMemoryDatabase {
       difficulty: difficulty as 'easy' | 'medium' | 'hard' | undefined,
       priority: (priority ?? 'sem') as 'urgente' | 'alta' | 'media' | 'baixa' | 'sem',
       status: 'pending',
+      scheduledTime: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -171,6 +173,14 @@ class InMemoryDatabase {
     const task = this.tasks.get(taskId);
     if (task) {
       task.status = status;
+      task.updatedAt = new Date();
+    }
+  }
+
+  updateTaskScheduledTime(taskId: number, scheduledTime: string | null) {
+    const task = this.tasks.get(taskId);
+    if (task) {
+      task.scheduledTime = scheduledTime;
       task.updatedAt = new Date();
     }
   }

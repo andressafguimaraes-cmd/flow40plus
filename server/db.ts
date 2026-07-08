@@ -254,6 +254,19 @@ export async function updateTaskStatus(taskId: number, status: "pending" | "in_p
   await db.update(tasks).set({ status }).where(eq(tasks.id, taskId));
 }
 
+export async function updateTaskScheduledTime(taskId: number, scheduledTime: string | null) {
+  const db = await getDb();
+  if (!db) {
+    if (useMemoryFallback) {
+      memoryDb.updateTaskScheduledTime(taskId, scheduledTime);
+      return;
+    }
+    throw new Error("Database not available");
+  }
+
+  await db.update(tasks).set({ scheduledTime }).where(eq(tasks.id, taskId));
+}
+
 export async function deleteTask(taskId: number) {
   const db = await getDb();
   if (!db) {

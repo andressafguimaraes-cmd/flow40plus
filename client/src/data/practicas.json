@@ -1,0 +1,74 @@
+[
+  {
+    "id": 1,
+    "pilar": "corpo",
+    "titulo": "Soltura de Ombros e Pescoço",
+    "descricao": "Faça movimentos circulares suaves com os ombros para trás 5 vezes. Depois, decline a cabeça levemente para o lado direito e esquerdo, liberando a tensão acumulada.",
+    "duracao": 2,
+    "recupera": "energia",
+    "icone": "🧘🏽‍♀️"
+  },
+  {
+    "id": 2,
+    "pilar": "corpo",
+    "titulo": "Alongamento de Punhos",
+    "descricao": "Estenda o braço para a frente com a palma da mão para cima e puxe os dedos gentilmente para baixo com a outra mão. Segure por 30 segundos e inverta. Ideal para quem digita muito.",
+    "duracao": 1,
+    "recupera": "energia",
+    "icone": "🖐🏽"
+  },
+  {
+    "id": 3,
+    "pilar": "mente",
+    "titulo": "O Foco Visual Distante",
+    "descricao": "Desvie os olhos da tela. Olhe pela janela ou para o ponto mais distante do cômodo por 45 segundos. Deixe os músculos dos olhos relaxarem para reduzir a fadiga mental.",
+    "duracao": 1,
+    "recupera": "clareza",
+    "icone": "👁️"
+  },
+  {
+    "id": 4,
+    "pilar": "mente",
+    "titulo": "Técnica do Aterramento (3 Coisas)",
+    "descricao": "Olhe ao seu redor e mentalmente nomeie: 3 coisas que você pode ver, 2 sons que você consegue ouvir e 1 sensação física agora. Isso zera o cache de ansiedade do cérebro.",
+    "duracao": 2,
+    "recupera": "clareza",
+    "icone": "🌿"
+  },
+  {
+    "id": 5,
+    "pilar": "respiracao",
+    "titulo": "Respiração Quadrada (Calma)",
+    "descricao": "Inspire pelo nariz por 4 segundos. Segure o ar nos pulmões por 4 segundos. Solte o ar suavemente pela boca por 4 segundos. Mantenha os pulmões vazios por 4 segundos. Repita o ciclo.",
+    "duracao": 3,
+    "recupera": "clareza",
+    "icone": "💨"
+  },
+  {
+    "id": 6,
+    "pilar": "respiracao",
+    "titulo": "Respiração Estimulante (Foco)",
+    "descricao": "Faça 10 inspirações e expirações rápidas e profundas pelo nariz, expandindo o abdômen. Ideal para mandar oxigênio puro para o cérebro naquele momento em que o sono aperta.",
+    "duracao": 1,
+    "recupera": "sono",
+    "icone": "⚡"
+  },
+  {
+    "id": 7,
+    "pilar": "corpo",
+    "titulo": "Caminhada de Reset",
+    "descricao": "Fique de pé, vá até a cozinha ou dê uma volta curta pelo ambiente. Beba um copo de água prestando atenção no fluxo da água. Movimentar o corpo quebra o ciclo de estafa.",
+    "duracao": 3,
+    "recupera": "sono",
+    "icone": "🚶🏽‍♀️"
+  },
+  {
+    "id": 8,
+    "pilar": "mente",
+    "titulo": "Tela em Branco (Pausa Total)",
+    "descricao": "Feche os olhos por completo. Imagine uma tela totalmente branca ou preta. Se algum pensamento de tarefa vier, apenas deixe-o passar como uma nuvem. Respire fundo.",
+    "duracao": 2,
+    "recupera": "sono",
+    "icone": "🧘🏽‍♀️"
+  }
+]

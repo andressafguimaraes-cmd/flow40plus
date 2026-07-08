@@ -12,13 +12,19 @@ import Calendar from "./pages/Calendar";
 import { useState, useEffect } from "react";
 import Login from "@/pages/Login";
 import { useAuth } from "@/hooks/useAuth";
+import Logo from "@/components/Logo";
+import { useReminders } from "@/hooks/useReminders";
+import Termos from "@/pages/Termos";
+import Ajuda from "@/pages/Ajuda";
 
-const LEGACY_ROUTES = ["/calendar", "/practices"];
+const LEGACY_ROUTES = ["/calendar", "/practices", "/ajuda"];
 
 function AppShell() {
   const [location, setLocation] = useLocation();
   const [showCheckIn, setShowCheckIn] = useState(false);
   const { user, loading, isAuthenticated } = useAuth();
+
+  useReminders(isAuthenticated);
 
   // Mostra o check-in como pop-up na primeira visita do dia
   useEffect(() => {
@@ -46,13 +52,18 @@ function AppShell() {
     setLocation("/dashboard");
   };
 
+  // Termos & Privacidade são acessíveis mesmo sem autenticação (link no rodapé do Login)
+  if (location === "/termos") {
+    return <Termos />;
+  }
+
   // Show loading state
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#FDF5E6] flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#E67E22] mx-auto mb-4"></div>
-          <p className="text-[#003366] font-semibold">Carregando...</p>
+          <Logo size="md" showManifesto={false} className="mb-6" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent mx-auto"></div>
         </div>
       </div>
     );
@@ -77,6 +88,7 @@ function AppShell() {
       )}
       {location === "/calendar" && <Calendar />}
       {location === "/practices" && <Practices />}
+      {location === "/ajuda" && <Ajuda />}
       {!isTabRoute && !isLegacyRoute && <NotFound />}
 
       <BottomNav />
@@ -94,7 +106,7 @@ function AppShell() {
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider defaultTheme="light">
+      <ThemeProvider defaultTheme="light" switchable>
         <TooltipProvider>
           <Toaster />
           <AppShell />

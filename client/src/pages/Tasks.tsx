@@ -16,6 +16,7 @@ type TaskPriority = "urgente" | "alta" | "media" | "baixa" | "sem";
 interface MicroStep { title: string; description: string; estimatedTime: number; difficulty: string; }
 interface TaskItem {
   id: number; title: string; priority?: TaskPriority | null; totalEstimatedTime?: number | null;
+  scheduledTime?: string | null;
   status: string; steps: { id: number; title: string; completed: boolean; estimatedTime?: number }[];
   progress: number;
 }
@@ -85,50 +86,50 @@ export default function Tasks() {
   return (
     <div className="screen-container">
       <AppHeader />
-      <div className="px-5 mb-2">
-        <h2 className="text-2xl font-black text-[#1C1C1E]">Tarefas</h2>
-        {totalMinutes > 0 && <p className="text-xs text-[#8E8E93]">~{totalH > 0 ? `${totalH}h ` : ""}{totalM > 0 ? `${totalM}min` : ""} pendentes hoje</p>}
+      <div className="px-5 mb-3">
+        <h2 className="text-2xl font-light text-foreground">Tarefas</h2>
+        {totalMinutes > 0 && <p className="text-xs text-muted mt-0.5">~{totalH > 0 ? `${totalH}h ` : ""}{totalM > 0 ? `${totalM}min` : ""} pendentes hoje</p>}
       </div>
 
-      {/* Input de tarefa */}
-      <div className="mx-5 mb-3 bg-white rounded-2xl border border-[#E8DFD0] p-4">
-        <div className="flex gap-2 mb-2">
+      {/* Captura rápida */}
+      <div className="mx-5 mb-4 bg-card rounded-2xl border border-border p-5">
+        <div className="flex gap-2 mb-2.5">
           <input
             value={taskInput} onChange={e => setTaskInput(e.target.value)}
             placeholder="Qual tarefa você quer capturar?"
-            className="flex-1 text-sm bg-[#FDF5E6] rounded-xl border border-[#E8DFD0] px-3 py-2.5 outline-none focus:border-[#E67E22] placeholder:text-[#C0B8A8]"
+            className="flex-1 text-sm bg-background rounded-xl border border-border px-3.5 py-2.5 outline-none transition-colors focus:border-accent placeholder:text-muted"
           />
           <button onClick={handleVoice}
-            className="w-10 h-10 rounded-xl bg-[#FEF3E2] flex items-center justify-center text-lg flex-shrink-0">
+            className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-lg flex-shrink-0">
             🎙️
           </button>
         </div>
-        <div className="flex gap-2 mb-2">
+        <div className="flex gap-2 mb-3">
           <input
             value={timeInput} onChange={e => setTimeInput(e.target.value)}
             placeholder="Tempo (ex: 30 min, 1h)"
-            className="flex-1 text-sm bg-[#FDF5E6] rounded-xl border border-[#E8DFD0] px-3 py-2 outline-none focus:border-[#E67E22] placeholder:text-[#C0B8A8]"
+            className="flex-1 text-sm bg-background rounded-xl border border-border px-3.5 py-2 outline-none transition-colors focus:border-accent placeholder:text-muted"
           />
           <button onClick={() => setShowPriorityModal(true)}
-            className="flex items-center gap-1 px-3 py-2 rounded-xl border border-[#E8DFD0] bg-[#FDF5E6] text-xs font-bold"
+            className="flex items-center gap-1 px-3 py-2 rounded-xl border border-border bg-background text-xs font-bold"
             style={{ color: PRIORITIES.find(p => p.key === priority)?.color }}>
             {PRIORITIES.find(p => p.key === priority)?.label.split(" ")[0]} {priority !== "sem" ? priority.charAt(0).toUpperCase() + priority.slice(1) : "Prioridade"}
           </button>
         </div>
         <button onClick={handleDecompose} disabled={decomposing || !taskInput.trim()}
-          className="w-full h-10 rounded-xl bg-[#E67E22] text-white text-sm font-bold disabled:opacity-50 transition-all active:scale-95">
+          className="w-full h-10 rounded-xl bg-secondary text-white text-sm font-semibold disabled:opacity-50 transition-all active:scale-95">
           {decomposing ? "✨ Decompondo com IA..." : "✨ Deixar a IA decompor em micro-passos"}
         </button>
       </div>
 
       {/* Filtros */}
-      <div className="flex gap-2 px-5 mb-3 overflow-x-auto scrollbar-hide">
+      <div className="flex gap-2 px-5 mb-4 overflow-x-auto scrollbar-hide">
         {[{ key: "todas", label: "Todas" }, ...PRIORITIES].map(p => (
           <button key={p.key} onClick={() => setFilter(p.key)}
             className="flex-shrink-0 text-xs font-bold px-3 py-1.5 rounded-full border transition-all"
             style={filter === p.key
-              ? { background: PRIORITIES.find(x => x.key === p.key)?.color ?? "#E67E22", color: "white", borderColor: "transparent" }
-              : { background: "white", color: "#8E8E93", borderColor: "#E8DFD0" }}>
+              ? { background: PRIORITIES.find(x => x.key === p.key)?.color ?? "var(--color-secondary)", color: "white", borderColor: "transparent" }
+              : { background: "var(--color-card)", color: "var(--color-muted)", borderColor: "var(--color-border)" }}>
             {p.label}
           </button>
         ))}
@@ -142,35 +143,40 @@ export default function Tasks() {
         const bH = Math.floor(blockMinutes / 60), bM = blockMinutes % 60;
         const isExpanded = expandedBlocks[p.key] !== false;
         return (
-          <div key={p.key} className="task-block mb-3" style={{ borderColor: p.border }}>
+          <div key={p.key} className="task-block" style={{ borderColor: p.border }}>
             <div className="task-block-header" style={{ background: p.bg }}
                  onClick={() => setExpandedBlocks(prev => ({ ...prev, [p.key]: !isExpanded }))}>
               <span className="text-sm">{p.label.split(" ")[0]}</span>
               <span className="text-xs font-bold flex-1" style={{ color: p.color }}>{p.label.split(" ").slice(1).join(" ")}</span>
-              <span className="text-[10px] text-[#8E8E93]">{blockTasks.length} tarefa{blockTasks.length !== 1 ? "s" : ""}{blockMinutes > 0 ? ` · ~${bH > 0 ? bH + "h " : ""}${bM > 0 ? bM + "min" : ""}` : ""}</span>
-              <span className="text-[#8E8E93] text-xs ml-1">{isExpanded ? "▲" : "▼"}</span>
+              <span className="text-[10px] text-muted">{blockTasks.length} tarefa{blockTasks.length !== 1 ? "s" : ""}{blockMinutes > 0 ? ` · ~${bH > 0 ? bH + "h " : ""}${bM > 0 ? bM + "min" : ""}` : ""}</span>
+              <span className="text-muted text-xs ml-1">{isExpanded ? "▲" : "▼"}</span>
             </div>
             {isExpanded && blockTasks.map(task => (
               <div key={task.id} className="task-item flex-col">
                 <div className="flex items-center gap-2 w-full">
                   <input type="checkbox" checked={task.status === "completed"}
                     onChange={e => updateStatus.mutate({ taskId: task.id, status: e.target.checked ? "completed" : "pending" })}
-                    className="w-4 h-4 rounded accent-[#E67E22] flex-shrink-0" />
+                    className="w-4 h-4 rounded accent-accent flex-shrink-0" />
+                  {task.scheduledTime && (
+                    <span className="flex items-center gap-1 text-[10px] font-bold text-secondary bg-secondary/5 px-2 py-0.5 rounded-full flex-shrink-0">
+                      ⚓ {task.scheduledTime}
+                    </span>
+                  )}
                   {editingTask === task.id ? (
                     <input autoFocus value={editValue} onChange={e => setEditValue(e.target.value)}
                       onBlur={() => setEditingTask(null)} onKeyDown={e => { if (e.key === "Enter") setEditingTask(null); if (e.key === "Escape") setEditingTask(null); }}
-                      className="flex-1 text-sm bg-[#FDF5E6] border border-[#E67E22] rounded-lg px-2 py-1 outline-none" />
+                      className="flex-1 text-sm bg-background border border-accent rounded-lg px-2 py-1 outline-none" />
                   ) : (
-                    <span className={`flex-1 text-sm font-semibold ${task.status === "completed" ? "line-through text-[#8E8E93]" : "text-[#1C1C1E]"}`}
+                    <span className={`flex-1 text-sm font-medium ${task.status === "completed" ? "line-through text-muted" : "text-foreground"}`}
                           onDoubleClick={() => { setEditingTask(task.id); setEditValue(task.title); }}>
                       {task.title}
                     </span>
                   )}
                   {!!task.totalEstimatedTime && task.totalEstimatedTime > 0 && (
-                    <span className="text-[10px] text-[#8E8E93] flex-shrink-0">⏱ {task.totalEstimatedTime}min</span>
+                    <span className="text-[10px] text-muted flex-shrink-0">⏱ {task.totalEstimatedTime}min</span>
                   )}
                   <button onClick={() => setExpandedTasks(prev => ({ ...prev, [task.id]: !prev[task.id] }))}
-                    className="text-xs text-[#8E8E93] flex-shrink-0">
+                    className="text-xs text-muted flex-shrink-0">
                     {task.steps?.length > 0 ? (expandedTasks[task.id] ? "▲" : `▼ ${task.steps.length}`) : ""}
                   </button>
                 </div>
@@ -178,23 +184,23 @@ export default function Tasks() {
                   <div key={step.id} className="flex items-center gap-2 mt-2 ml-6">
                     <input type="checkbox" checked={step.completed}
                       onChange={e => updateStep.mutate({ microStepId: step.id, completed: e.target.checked })}
-                      className="w-3.5 h-3.5 rounded accent-[#E67E22]" />
-                    <span className={`text-xs ${step.completed ? "line-through text-[#8E8E93]" : "text-[#3C3C43]"}`}>{step.title}</span>
-                    {step.estimatedTime && <span className="text-[9px] text-[#8E8E93]">~{step.estimatedTime}min</span>}
+                      className="w-3.5 h-3.5 rounded accent-accent" />
+                    <span className={`text-xs ${step.completed ? "line-through text-muted" : "text-foreground"}`}>{step.title}</span>
+                    {step.estimatedTime && <span className="text-[9px] text-muted">~{step.estimatedTime}min</span>}
                   </div>
                 ))}
                 {task.steps?.length > 0 && (
                   <div className="mt-2 ml-6 w-full">
-                    <div className="h-1 rounded-full bg-[#E8DFD0] overflow-hidden">
-                      <div className="h-full rounded-full bg-[#2E8B57] transition-all" style={{ width: `${task.progress}%` }} />
+                    <div className="h-1 rounded-full bg-border overflow-hidden">
+                      <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${task.progress}%` }} />
                     </div>
-                    <span className="text-[9px] text-[#8E8E93]">{task.progress}% concluído</span>
+                    <span className="text-[9px] text-muted">{task.progress}% concluído</span>
                   </div>
                 )}
               </div>
             ))}
             {isExpanded && blockTasks.length === 0 && (
-              <div className="px-4 py-3 text-xs text-[#8E8E93] text-center bg-white">Nenhuma tarefa nesta prioridade</div>
+              <div className="px-4 py-3 text-xs text-muted text-center bg-card">Nenhuma tarefa nesta prioridade</div>
             )}
           </div>
         );
@@ -203,13 +209,13 @@ export default function Tasks() {
       {/* Modal de prioridade */}
       {showPriorityModal && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={() => setShowPriorityModal(false)}>
-          <div className="w-full max-w-md bg-white rounded-t-3xl p-5" onClick={e => e.stopPropagation()}>
-            <div className="w-10 h-1 rounded-full bg-[#E8DFD0] mx-auto mb-4" />
-            <h3 className="text-base font-black text-[#1C1C1E] mb-3">Definir prioridade</h3>
+          <div className="w-full max-w-md bg-background rounded-t-3xl p-5" onClick={e => e.stopPropagation()}>
+            <div className="w-10 h-1 rounded-full bg-border mx-auto mb-4" />
+            <h3 className="text-base font-black text-foreground mb-3">Definir prioridade</h3>
             {PRIORITIES.map(p => (
               <button key={p.key} onClick={() => { setPriority(p.key as TaskPriority); setShowPriorityModal(false); }}
                 className="w-full flex items-center gap-3 p-3 rounded-xl mb-2 text-left transition-all"
-                style={{ background: priority === p.key ? p.bg : "transparent", border: `1.5px solid ${priority === p.key ? p.border : "#E8DFD0"}` }}>
+                style={{ background: priority === p.key ? p.bg : "transparent", border: `1.5px solid ${priority === p.key ? p.border : "var(--color-border)"}` }}>
                 <span className="text-lg">{p.label.split(" ")[0]}</span>
                 <span className="text-sm font-bold" style={{ color: p.color }}>{p.label.split(" ").slice(1).join(" ")}</span>
                 {priority === p.key && <span className="ml-auto text-xs font-bold" style={{ color: p.color }}>✓</span>}

@@ -373,6 +373,16 @@ console.log("RAW AI RESPONSE:", responseText);
         return { success: true };
       }),
 
+    setScheduledTime: publicProcedure
+      .input(z.object({
+        taskId: z.number(),
+        scheduledTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        await db.updateTaskScheduledTime(input.taskId, input.scheduledTime);
+        return { success: true };
+      }),
+
     getDecompositionHistory: publicProcedure
       .query(async ({ ctx }) => {
         if (!ctx.user) {

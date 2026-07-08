@@ -1,6 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import AppHeader from "@/components/AppHeader";
-import { useLocation } from "wouter";
+import { toast } from "sonner";
+import { useSuggestedPractice } from "@/hooks/useSuggestedPractice";
 
 const INSIGHTS = [
   "Energia não é fazer mais. É focar no que importa com presença.",
@@ -9,18 +10,11 @@ const INSIGHTS = [
   "Cuidar de si não é egoísmo. É a base para cuidar de tudo mais.",
 ];
 
-const RECS = [
-  { icon: "🎯", bg: "#FEF3E2", title: "Tarefa de Foco Profundo", desc: "Trabalhe em algo importante por 60–90 min.", path: "/tasks" },
-  { icon: "🌿", bg: "#E8F5EE", title: "Micro-Prática de Alívio", desc: "Respire, solte e recupere sua energia.", path: "/practices" },
-  { icon: "💪", bg: "#FEF3C7", title: "Fortalecimento Mental", desc: "Exercite sua mente com intenção.", path: "/practices" },
-];
-
 interface DashboardProps {
   onOpenCheckIn?: () => void;
 }
 
 export default function Dashboard({ onOpenCheckIn }: DashboardProps) {
-  const [, setLocation] = useLocation();
   const { data: todayCheckIn } = trpc.checkIns.getTodayCheckIn.useQuery();
   const { data: weeklyStats } = trpc.checkIns.getWeeklyStats.useQuery();
 
@@ -36,23 +30,20 @@ export default function Dashboard({ onOpenCheckIn }: DashboardProps) {
 
   const insight = INSIGHTS[today.getDate() % INSIGHTS.length];
 
-  // Scores /100 baseados nos dados do check-in (escala 1-5) ou médias semanais
-  const sleepScore = todayCheckIn ? Math.round(todayCheckIn.sleepQuality * 20) : (weeklyStats ? Math.round(weeklyStats.averageSleep * 20) : 0);
-  const energyScore = todayCheckIn ? Math.round(todayCheckIn.energyLevel * 20) : (weeklyStats ? Math.round(weeklyStats.averageEnergy * 20) : 0);
-  const clarityScore = todayCheckIn ? Math.round(todayCheckIn.mentalClarity * 20) : (weeklyStats ? Math.round(weeklyStats.averageClarity * 20) : 0);
+  // Scores /100 baseados nos dados do check-in — domínio real [1, 5]: 1 → 0, 5 → 100
+  const toScore = (raw: number) => Math.round(((raw - 1) / 4) * 100);
+  const sleepScore = todayCheckIn ? toScore(todayCheckIn.sleepQuality) : (weeklyStats ? toScore(weeklyStats.averageSleep) : 0);
+  const energyScore = todayCheckIn ? toScore(todayCheckIn.energyLevel) : (weeklyStats ? toScore(weeklyStats.averageEnergy) : 0);
+  const clarityScore = todayCheckIn ? toScore(todayCheckIn.mentalClarity) : (weeklyStats ? toScore(weeklyStats.averageClarity) : 0);
 
-  const getScoreColor = (score: number) => {
-    if (score >= 70) return "#2E8B57";
-    if (score >= 40) return "#E67E22";
-    return "#E74C3C";
-  };
+  const suggestedPractice = useSuggestedPractice({ sleepScore, energyScore, clarityScore });
+  const handleCompletePractice = () => toast.success("Pausa concluída! 🌿");
 
   const getScoreLabel = (score: number) => {
     if (score >= 80) return "Ótimo";
     if (score >= 60) return "Bom";
     if (score >= 40) return "Moderado";
-    if (score > 0) return "Baixo";
-    return "—";
+    return "Baixo";
   };
 
   return (
@@ -87,49 +78,52 @@ export default function Dashboard({ onOpenCheckIn }: DashboardProps) {
           <p className="section-title">Seu estado hoje</p>
           <div className="grid grid-cols-3 gap-3 px-5 mb-4">
             {[
-              { label: "Sono", score: sleepScore, icon: "🌙" },
-              { label: "Energia", score: energyScore, icon: "⚡" },
-              { label: "Clareza", score: clarityScore, icon: "🧠" },
-            ].map(({ label, score, icon }) => (
-              <div key={label} className="bg-white rounded-2xl border border-[#E8DFD0] p-3 text-center">
+              { label: "Sono", score: sleepScore, icon: "🌙", tone: "secondary" as const },
+              { label: "Energia", score: energyScore, icon: "⚡", tone: "accent" as const },
+              { label: "Clareza", score: clarityScore, icon: "🧠", tone: "accent" as const },
+            ].map(({ label, score, icon, tone }) => (
+              <div key={label} className="bg-card rounded-2xl border border-border p-3 text-center">
                 <div className="text-xl mb-1">{icon}</div>
-                <div className="text-2xl font-black" style={{ color: getScoreColor(score) }}>{score}</div>
-                <div className="text-[9px] text-[#8E8E93] font-semibold">/100</div>
-                <div className="text-[10px] font-bold mt-1 px-2 py-0.5 rounded-full"
-                     style={{ background: getScoreColor(score) + "20", color: getScoreColor(score) }}>
-                  {getScoreLabel(score)}
+                <div className={`text-2xl font-light ${tone === "secondary" ? "text-secondary" : "text-accent"}`}>{score}</div>
+                <div className="text-[9px] text-muted font-semibold">/100</div>
+                <div className="h-1 rounded-full bg-border overflow-hidden mt-2">
+                  <div className={`h-full rounded-full transition-all ${tone === "secondary" ? "bg-secondary" : "bg-accent"}`}
+                       style={{ width: `${score}%` }} />
                 </div>
-                <div className="text-[10px] text-[#8E8E93] mt-0.5">{label}</div>
+                <div className={`text-[10px] font-semibold mt-1.5 ${tone === "secondary" ? "text-secondary" : "text-accent"}`}>{getScoreLabel(score)}</div>
+                <div className="text-[10px] text-muted mt-0.5">{label}</div>
               </div>
             ))}
           </div>
         </>
       ) : (
-        <div className="mx-5 mb-4 bg-white rounded-2xl border border-[#E8DFD0] p-4 text-center">
-          <p className="text-sm text-[#8E8E93] mb-2">Faça o check-up matinal para ver seus scores</p>
-          <button className="text-xs font-bold text-[#E67E22]" onClick={handleOpenCheckIn}>
+        <div className="mx-5 mb-4 bg-card rounded-2xl border border-border p-4 text-center">
+          <p className="text-sm text-muted mb-2">Faça o check-up matinal para ver seus scores</p>
+          <button className="text-xs font-bold text-accent" onClick={handleOpenCheckIn}>
             Fazer check-up agora →
           </button>
         </div>
       )}
 
-      {/* Recomendados */}
-      <p className="section-title">Recomendado para você</p>
-      <div className="px-5 space-y-3 mb-4">
-        {RECS.map((rec) => (
-          <button key={rec.title} onClick={() => setLocation(rec.path)}
-            className="w-full flex items-center gap-3 bg-white rounded-2xl border border-[#E8DFD0] p-4 text-left hover:shadow-md transition-all active:scale-[0.98]">
-            <div className="w-11 h-11 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
-                 style={{ background: rec.bg }}>
-              {rec.icon}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-[#1C1C1E]">{rec.title}</p>
-              <p className="text-xs text-[#8E8E93] mt-0.5">{rec.desc}</p>
-            </div>
-            <span className="text-[#8E8E93] text-lg">›</span>
-          </button>
-        ))}
+      {/* A Próxima Melhor Decisão */}
+      <p className="section-title">A Próxima Melhor Decisão</p>
+      <div className="mx-5 mb-4 bg-card rounded-3xl border border-border p-6">
+        <div className="flex items-start gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-accent/10 flex items-center justify-center text-2xl flex-shrink-0">
+            {suggestedPractice.icone}
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-lg font-light text-secondary mb-1.5 leading-snug">{suggestedPractice.titulo}</h3>
+            <p className="text-sm text-muted leading-relaxed">{suggestedPractice.descricao}</p>
+            <p className="text-xs text-muted mt-2">⏱ {suggestedPractice.duracao} min · recupera {suggestedPractice.recupera}</p>
+          </div>
+        </div>
+        <button
+          onClick={handleCompletePractice}
+          className="w-full mt-5 h-11 rounded-2xl bg-accent text-white text-sm font-semibold transition-all active:scale-95"
+        >
+          Fazer essa pausa agora
+        </button>
       </div>
 
       {/* Link discreto de refazer check-in */}

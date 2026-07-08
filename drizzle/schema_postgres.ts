@@ -65,6 +65,7 @@ export const tasks = pgTable("tasks", {
   difficulty: difficultyEnum("difficulty"),
   priority: taskPriorityEnum("priority").default("sem"),
   status: taskStatusEnum("status").default("pending"),
+  scheduledTime: text("scheduled_time"), // fixed start time "HH:MM", null = flexible task
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
