@@ -2,6 +2,17 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import Logo from "@/components/Logo";
+import { toast } from "sonner";
+
+// Paleta específica desta tela (mais escura/saturada que os tokens do app claro),
+// conforme mockup fornecido para a tela de login.
+const NAVY = "#0F2A48";
+const ORANGE = "#E8813A";
+const SAGE = "#5FA37A";
+const TEXT_FAINT = "#8FA0B5";
+const TEXT_MUTED = "#7C8AA0";
+const FIELD_BG = "rgba(255,255,255,0.04)";
+const FIELD_BORDER = "rgba(255,255,255,0.16)";
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -10,6 +21,7 @@ export default function Login() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,109 +42,130 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-6">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden" style={{ background: NAVY }}>
+      {/* Ondas decorativas de fundo */}
+      <svg className="absolute top-0 left-0 w-24 h-56 opacity-50 pointer-events-none" viewBox="0 0 60 220" fill="none">
+        <path d="M40 0 C10 40, 55 80, 20 120 C-5 150, 30 190, 15 220" stroke={ORANGE} strokeWidth="1.4" fill="none" />
+      </svg>
+      <svg className="absolute bottom-0 right-0 w-36 h-56 opacity-50 pointer-events-none" viewBox="0 0 140 220" fill="none">
+        <path d="M140 40 C100 70, 130 110, 90 140 C60 165, 80 200, 40 220" stroke={SAGE} strokeWidth="1.4" fill="none" />
+        <path d="M118 190 l6 -6 M124 184 l6 6 M124 196 l-6 -6" stroke={SAGE} strokeWidth="1.4" fill="none" strokeLinecap="round" />
+      </svg>
+
+      <div className="w-full max-w-sm relative z-10">
         {/* Logo e marca */}
-        <div className="mb-14">
-          <Logo size="lg" />
+        <div className="flex flex-col items-center mb-8">
+          <Logo size="md" dark />
         </div>
 
-        {/* Cartão de autenticação */}
-        <div className="bg-card rounded-3xl border border-border shadow-sm p-10">
-          <h2 className="text-2xl font-light text-secondary mb-2 leading-snug">
-            {mode === "signup" ? "Vamos começar com calma" : "Bom ter você aqui"}
-          </h2>
-          <p className="text-muted text-sm mb-8 leading-relaxed">
-            {mode === "signup"
-              ? "Este é um espaço seguro, sem cobranças, para você organizar sua rotina no seu próprio ritmo."
-              : "Vamos pausar e planejar com calma?"}
+        {/* Título */}
+        <div className="text-center mb-8">
+          <h1 className="text-xl font-bold text-white leading-snug">
+            Seu ritmo. Sua jornada.
+            <br />
+            <span style={{ color: ORANGE }}>Nossa orientação.</span>
+          </h1>
+          <p className="text-sm mt-2.5 leading-relaxed" style={{ color: TEXT_FAINT }}>
+            Organize sua rotina com mais
+            <br />
+            clareza, foco e equilíbrio.
           </p>
+        </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4 mb-5">
-            {mode === "signup" && (
-              <div>
-                <label className="block text-xs font-semibold text-secondary mb-1.5">Nome</label>
-                <input
-                  type="text"
-                  required
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground outline-none transition-colors focus:border-accent"
-                  placeholder="Seu nome"
-                />
-              </div>
-            )}
-
-            <div>
-              <label className="block text-xs font-semibold text-secondary mb-1.5">E-mail</label>
+        <form onSubmit={handleSubmit} className="space-y-3.5">
+          {mode === "signup" && (
+            <div className="flex items-center gap-2.5 rounded-2xl px-4 h-[52px]" style={{ background: FIELD_BG, border: `1px solid ${FIELD_BORDER}` }}>
+              <span style={{ color: "#B8C4D2" }}>👤</span>
               <input
-                type="email"
                 required
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground outline-none transition-colors focus:border-accent"
-                placeholder="seu@email.com"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                placeholder="Seu nome"
+                className="flex-1 bg-transparent outline-none text-white text-sm placeholder:text-[#8FA0B5]"
               />
             </div>
+          )}
 
-            <div>
-              <label className="block text-xs font-semibold text-secondary mb-1.5">Senha</label>
-              <input
-                type="password"
-                required
-                minLength={8}
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground outline-none transition-colors focus:border-accent"
-                placeholder="Mínimo 8 caracteres"
-              />
-            </div>
+          <div className="flex items-center gap-2.5 rounded-2xl px-4 h-[52px]" style={{ background: FIELD_BG, border: `1px solid ${FIELD_BORDER}` }}>
+            <span style={{ color: "#B8C4D2" }}>✉</span>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="E-mail"
+              className="flex-1 bg-transparent outline-none text-white text-sm placeholder:text-[#8FA0B5]"
+            />
+          </div>
 
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-                {error}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-secondary text-white font-semibold py-3.5 rounded-xl transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading
-                ? "Aguarde..."
-                : mode === "signup"
-                  ? "Criar conta"
-                  : "Entrar"}
+          <div className="flex items-center gap-2.5 rounded-2xl px-4 h-[52px]" style={{ background: FIELD_BG, border: `1px solid ${FIELD_BORDER}` }}>
+            <span style={{ color: "#B8C4D2" }}>🔒</span>
+            <input
+              type={showPassword ? "text" : "password"}
+              required
+              minLength={8}
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="Senha"
+              className="flex-1 bg-transparent outline-none text-white text-sm placeholder:text-[#8FA0B5]"
+            />
+            <button type="button" onClick={() => setShowPassword(v => !v)} style={{ color: "#B8C4D2" }} aria-label="Mostrar senha">
+              {showPassword ? "🙈" : "👁"}
             </button>
-          </form>
+          </div>
+
+          {mode === "login" && (
+            <button
+              type="button"
+              onClick={() => toast.info("Em breve! Por enquanto, fale com o suporte para redefinir sua senha.")}
+              className="w-full text-right text-xs font-medium"
+              style={{ color: ORANGE }}
+            >
+              Esqueci minha senha
+            </button>
+          )}
+
+          {error && (
+            <div className="px-4 py-3 rounded-xl text-sm" style={{ background: "rgba(231,76,60,0.12)", border: "1px solid rgba(231,76,60,0.3)", color: "#F5B7B1" }}>
+              {error}
+            </div>
+          )}
 
           <button
-            type="button"
-            onClick={() => {
-              setMode(mode === "signup" ? "login" : "signup");
-              setError(null);
-            }}
-            className="w-full text-center text-sm text-accent font-semibold hover:underline"
+            type="submit"
+            disabled={loading}
+            className="w-full text-white font-semibold py-3.5 rounded-2xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ background: ORANGE }}
           >
-            {mode === "signup"
-              ? "Já tem conta? Entrar"
-              : "Ainda não tem conta? Cadastre-se"}
+            {loading ? "Aguarde..." : mode === "signup" ? "Criar conta" : "Entrar"}
           </button>
+        </form>
 
-          {/* Rodapé */}
-          <p className="text-center text-xs text-muted mt-7">
-            Ao continuar, você concorda com nossos{" "}
-            <button type="button" onClick={() => setLocation("/termos")} className="text-accent font-semibold hover:underline">
-              Termos de Uso e Privacidade
+        <p className="text-center text-sm mt-5" style={{ color: "#C7D0DA" }}>
+          {mode === "signup" ? "Já tem conta? " : "Ainda não possui conta? "}
+          <button
+            type="button"
+            onClick={() => { setMode(mode === "signup" ? "login" : "signup"); setError(null); }}
+            className="font-semibold"
+            style={{ color: ORANGE }}
+          >
+            {mode === "signup" ? "Entrar" : "Criar conta"}
+          </button>
+        </p>
+
+        {/* Rodapé legal */}
+        <div className="mt-10 pt-4" style={{ borderTop: "1px solid rgba(255,255,255,0.10)" }}>
+          <p className="text-center text-[11.5px] leading-relaxed" style={{ color: TEXT_MUTED }}>
+            Ao continuar, você concorda com nossos
+            <br />
+            <button type="button" onClick={() => setLocation("/termos")} className="font-medium" style={{ color: SAGE }}>
+              Termos de Uso
+            </button>{" "}
+            e{" "}
+            <button type="button" onClick={() => setLocation("/termos")} className="font-medium" style={{ color: ORANGE }}>
+              Política de Privacidade
             </button>
-          </p>
-        </div>
-
-        {/* Frase */}
-        <div className="mt-10 text-center">
-          <p className="text-muted italic text-sm">
-            "Pequenas pausas ao longo do dia podem aumentar sua produtividade e bem-estar."
+            .
           </p>
         </div>
       </div>

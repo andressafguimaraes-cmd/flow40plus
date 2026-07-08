@@ -2,6 +2,8 @@ interface LogoProps {
   size?: "sm" | "md" | "lg";
   showWaves?: boolean;
   showManifesto?: boolean;
+  /** Para uso sobre fundos escuros (ex: tela de login) — clareia o texto neutro. */
+  dark?: boolean;
   className?: string;
 }
 
@@ -11,8 +13,9 @@ const SIZES = {
   lg: { wave: "w-32 h-14", wordmark: "text-4xl", manifesto: "text-sm gap-2", gap: "mb-3" },
 } as const;
 
-export default function Logo({ size = "md", showWaves = true, showManifesto = true, className = "" }: LogoProps) {
+export default function Logo({ size = "md", showWaves = true, showManifesto = true, dark = false, className = "" }: LogoProps) {
   const s = SIZES[size];
+  const neutral = dark ? "text-white" : "text-secondary";
 
   return (
     <div className={`flex flex-col items-center ${className}`}>
@@ -24,16 +27,16 @@ export default function Logo({ size = "md", showWaves = true, showManifesto = tr
       )}
 
       <div className={`font-black leading-none ${s.wordmark}`}>
-        <span className="text-secondary">Flow</span>
+        <span className={neutral}>Flow</span>
         <span className="text-primary">40+</span>
       </div>
 
       {showManifesto && (
         <p className={`font-semibold mt-1.5 flex flex-wrap justify-center ${s.manifesto}`}>
-          <span className="text-secondary">Mova.</span>
+          <span className={neutral}>Mova.</span>
           <span className="text-accent">Nutra.</span>
-          <span className="text-primary">Floresca.</span>
-          <span className="text-secondary">Flua.</span>
+          <span className="text-primary">Floresça.</span>
+          <span className={neutral}>Flua.</span>
         </p>
       )}
     </div>

@@ -66,6 +66,7 @@ export const tasks = pgTable("tasks", {
   priority: taskPriorityEnum("priority").default("sem"),
   status: taskStatusEnum("status").default("pending"),
   scheduledTime: text("scheduled_time"), // fixed start time "HH:MM", null = flexible task
+  plannedDate: text("planned_date"), // "YYYY-MM-DD" day this task is assigned to; null = unplanned backlog
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

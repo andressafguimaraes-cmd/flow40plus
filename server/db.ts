@@ -251,7 +251,7 @@ export async function updateTaskStatus(taskId: number, status: "pending" | "in_p
     throw new Error("Database not available");
   }
 
-  await db.update(tasks).set({ status }).where(eq(tasks.id, taskId));
+  await db.update(tasks).set({ status, updatedAt: new Date() }).where(eq(tasks.id, taskId));
 }
 
 export async function updateTaskScheduledTime(taskId: number, scheduledTime: string | null) {
@@ -265,6 +265,32 @@ export async function updateTaskScheduledTime(taskId: number, scheduledTime: str
   }
 
   await db.update(tasks).set({ scheduledTime }).where(eq(tasks.id, taskId));
+}
+
+export async function updateTaskPlannedDate(taskId: number, plannedDate: string | null) {
+  const db = await getDb();
+  if (!db) {
+    if (useMemoryFallback) {
+      memoryDb.updateTaskPlannedDate(taskId, plannedDate);
+      return;
+    }
+    throw new Error("Database not available");
+  }
+
+  await db.update(tasks).set({ plannedDate }).where(eq(tasks.id, taskId));
+}
+
+export async function updateTaskPriority(taskId: number, priority: "urgente" | "alta" | "media" | "baixa" | "sem") {
+  const db = await getDb();
+  if (!db) {
+    if (useMemoryFallback) {
+      memoryDb.updateTaskPriority(taskId, priority);
+      return;
+    }
+    throw new Error("Database not available");
+  }
+
+  await db.update(tasks).set({ priority, updatedAt: new Date() }).where(eq(tasks.id, taskId));
 }
 
 export async function deleteTask(taskId: number) {

@@ -171,10 +171,47 @@ export const appRouter = router({
           return { averageSleep: 0, averageEnergy: 0, averageClarity: 0, count: 0 };
         }
       }),
+
+    getHistory: publicProcedure
+      .query(async ({ ctx }) => {
+        if (!ctx.user) {
+          throw new Error("User not authenticated");
+        }
+        try {
+          return await db.getWeeklyCheckIns(ctx.user.id);
+        } catch (error) {
+          return [];
+        }
+      }),
   }),
 
   // ===== Task Routes =====
   tasks: router({
+    create: publicProcedure
+      .input(z.object({
+        title: z.string().min(1).max(500),
+        priority: z.enum(["urgente", "alta", "media", "baixa", "sem"]).optional().default("sem"),
+        totalEstimatedTime: z.number().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) {
+          throw new Error("User not authenticated");
+        }
+        const result = await db.createTask(ctx.user.id, input.title, undefined, input.totalEstimatedTime, undefined, input.priority);
+        const taskId = typeof result === "object" && "insertId" in result ? (result.insertId as number) : 0;
+        return { taskId };
+      }),
+
+    updatePriority: publicProcedure
+      .input(z.object({
+        taskId: z.number(),
+        priority: z.enum(["urgente", "alta", "media", "baixa", "sem"]),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        await db.updateTaskPriority(input.taskId, input.priority);
+        return { success: true };
+      }),
+
     checkPriorityLimit: publicProcedure
       .query(async ({ ctx }) => {
         if (!ctx.user) {
@@ -380,6 +417,16 @@ console.log("RAW AI RESPONSE:", responseText);
       }))
       .mutation(async ({ ctx, input }) => {
         await db.updateTaskScheduledTime(input.taskId, input.scheduledTime);
+        return { success: true };
+      }),
+
+    setPlannedDate: publicProcedure
+      .input(z.object({
+        taskId: z.number(),
+        plannedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        await db.updateTaskPlannedDate(input.taskId, input.plannedDate);
         return { success: true };
       }),
 

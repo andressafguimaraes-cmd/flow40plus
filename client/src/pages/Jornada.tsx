@@ -1,104 +1,152 @@
 import { trpc } from "@/lib/trpc";
-import AppHeader from "@/components/AppHeader";
 
-const DAYS = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
+// Paleta específica desta tela (mockup fornecido)
+const NAVY = "#16365A";
+const SAGE = "#5FA37A";
+const ORANGE = "#E8813A";
+const BG_APP = "#EEF3EC";
+const TEXT_MUTED = "#8C948C";
+const LINE = "#E7E5DE";
 
-// Converte um valor na escala 1–5 para altura proporcional dentro do domínio [1, 5]
-function scaleToDomain(value: number, maxHeight: number) {
-  return Math.max(((value - 1) / 4) * maxHeight, 4);
+const WEEKDAYS_SHORT = ["S", "T", "Q", "Q", "S"]; // Seg a Sex
+const WEEKDAYS_FULL = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
+const MONTH_NAMES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+
+function dateKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
-function BarChart({ data, color, label }: { data: number[], color: string, label: string }) {
-  const max = Math.max(...data, 1);
-  return (
-    <div>
-      <p className="text-xs font-bold text-muted mb-2">{label}</p>
-      <div className="flex items-end gap-1.5 h-16">
-        {data.map((v, i) => (
-          <div key={i} className="flex-1 flex flex-col items-center gap-1">
-            <div className="w-full rounded-t-md transition-all" style={{ height: `${(v / max) * 52}px`, background: color, minHeight: 4 }} />
-            <span className="text-[9px] text-muted">{DAYS[i]}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+function getWeekdaysMonToFri(base: Date): Date[] {
+  const day = base.getDay();
+  const mondayOffset = day === 0 ? -6 : 1 - day;
+  const monday = new Date(base);
+  monday.setDate(base.getDate() + mondayOffset);
+  return Array.from({ length: 5 }, (_, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    return d;
+  });
+}
+
+function relativeDayLabel(date: Date): string {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((today.getTime() - d.getTime()) / 86400000);
+  const weekday = WEEKDAYS_FULL[d.getDay()];
+  if (diffDays === 0) return `Hoje, ${weekday}`;
+  if (diffDays === 1) return `Ontem, ${weekday}`;
+  return `${weekday}, ${d.getDate()} de ${MONTH_NAMES[d.getMonth()]}`;
 }
 
 export default function Jornada() {
-  const { data: weeklyStats } = trpc.checkIns.getWeeklyStats.useQuery();
+  const { data: history } = trpc.checkIns.getHistory.useQuery();
   const { data: tasks } = trpc.tasks.list.useQuery();
 
-  // Dados fictícios para demo (serão substituídos por dados reais) — escala 1-5
-  const sleepData = [3, 4, 2, 5, 4, 3, 4];
-  const energyData = [3, 4, 2, 4, 3, 4, 5];
-  const tasksPerDay = [3, 5, 2, 4, 3, 6, 2];
+  const today = new Date();
+  const weekDates = getWeekdaysMonToFri(today);
+  const allTasks = tasks ?? [];
+  const allHistory = history ?? [];
 
-  const completedTasks = tasks?.filter(t => t.status === "completed").length ?? 0;
-  const totalTasks = tasks?.length ?? 0;
+  const completedCountForDay = (day: Date) => {
+    const key = dateKey(day);
+    return allTasks.filter(t => t.status === "completed" && t.updatedAt && dateKey(new Date(t.updatedAt)) === key).length;
+  };
+
+  const energyForDay = (day: Date): number | null => {
+    const key = dateKey(day);
+    const entry = allHistory.find(h => dateKey(new Date(h.createdAt)) === key);
+    return entry?.energyLevel ?? null;
+  };
+
+  const dayCounts = weekDates.map(completedCountForDay);
+  const maxCount = Math.max(...dayCounts, 1);
+
+  const sortedHistory = [...allHistory].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const todayKey = dateKey(today);
 
   return (
-    <div className="screen-container">
-      <AppHeader />
-      <div className="px-5 mb-4">
-        <h2 className="text-2xl font-light text-foreground">Sua Jornada</h2>
-        <p className="text-sm text-muted">Resumo da semana</p>
-      </div>
+    <div className="min-h-screen pb-24" style={{ background: BG_APP }}>
+      <div className="px-5 pt-6">
+        <h1 className="text-[22px] font-bold" style={{ color: NAVY }}>Sua Jornada</h1>
+        <p className="text-[13px] font-medium mt-1 mb-6" style={{ color: TEXT_MUTED }}>O registro visual da sua constância e equilíbrio.</p>
 
-      {/* Resumo do check-in */}
-      <p className="section-title">Check-up de hoje</p>
-      <div className="grid grid-cols-3 gap-3 px-5 mb-4">
-        {[
-          { label: "Sono", value: weeklyStats?.averageSleep?.toFixed(1) ?? "—", icon: "🌙", className: "text-secondary" },
-          { label: "Energia", value: weeklyStats?.averageEnergy?.toFixed(1) ?? "—", icon: "⚡", className: "text-accent" },
-          { label: "Clareza", value: weeklyStats?.averageClarity?.toFixed(1) ?? "—", icon: "🧠", className: "text-foreground" },
-        ].map(({ label, value, icon, className }) => (
-          <div key={label} className="bg-card rounded-2xl border border-border p-3 text-center">
-            <div className="text-xl mb-1">{icon}</div>
-            <div className={`text-xl font-black ${className}`}>{value}</div>
-            <div className="text-[9px] text-muted">/5 média</div>
-            <div className="text-[10px] text-muted mt-0.5">{label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Gráfico Humor & Energia */}
-      <p className="section-title">Energia da semana</p>
-      <div className="mx-5 mb-4 bg-card rounded-2xl border border-border p-4">
-        <div className="flex gap-4 mb-3">
-          <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-secondary"/><span className="text-[10px] text-muted">Sono</span></div>
-          <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-accent"/><span className="text-[10px] text-muted">Energia</span></div>
-        </div>
-        <div className="flex items-end gap-1 h-20">
-          {DAYS.map((day, i) => (
-            <div key={day} className="flex-1 flex flex-col items-center gap-0.5">
-              <div className="w-full flex gap-0.5 items-end" style={{ height: 52 }}>
-                <div className="flex-1 rounded-t-sm bg-secondary" style={{ height: `${scaleToDomain(sleepData[i], 52)}px` }} />
-                <div className="flex-1 rounded-t-sm bg-accent" style={{ height: `${scaleToDomain(energyData[i], 52)}px` }} />
-              </div>
-              <span className="text-[9px] text-muted">{day}</span>
+        {/* Gráfico semanal */}
+        <div className="bg-white rounded-[20px] p-5 mb-6" style={{ boxShadow: "0 2px 12px rgba(22,54,90,0.04)" }}>
+          <div className="flex items-center justify-between mb-5">
+            <span className="text-sm font-bold" style={{ color: NAVY }}>Visão Semanal</span>
+            <div className="flex gap-3 text-[11px] font-semibold" style={{ color: NAVY }}>
+              <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: SAGE }} />Decisões</div>
+              <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: ORANGE }} />Energia</div>
             </div>
-          ))}
-        </div>
-      </div>
+          </div>
 
-      {/* Gráfico Tarefas */}
-      <p className="section-title">Tarefas concluídas por dia</p>
-      <div className="mx-5 mb-4 bg-card rounded-2xl border border-border p-4">
-        <BarChart data={tasksPerDay} color="var(--color-secondary)" label="Tarefas realizadas" />
-      </div>
+          <div className="flex items-end justify-between px-2" style={{ height: 120, borderBottom: `1px solid ${LINE}` }}>
+            {weekDates.map((d, i) => {
+              const count = dayCounts[i];
+              const barHeight = count > 0 ? Math.max((count / maxCount) * 95, 10) : 3;
+              const energia = energyForDay(d);
+              const dotBottom = energia != null ? 18 + ((energia - 1) / 4) * 90 : null;
+              const isToday = dateKey(d) === todayKey;
+              return (
+                <div key={i} className="flex-1 flex items-end justify-center" style={{ height: "100%" }}>
+                  <div className="relative w-3.5 rounded-t transition-all" style={{ height: barHeight, background: isToday ? SAGE : "rgba(95,163,122,0.2)" }}>
+                    {dotBottom != null && (
+                      <div
+                        className="absolute rounded-full"
+                        style={{ width: 6, height: 6, background: ORANGE, left: "50%", bottom: dotBottom, transform: "translateX(-50%)", boxShadow: "0 0 0 3px rgba(232,129,58,0.2)" }}
+                      />
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex justify-between px-2 pt-2">
+            {WEEKDAYS_SHORT.map((w, i) => (
+              <span key={i} className="flex-1 text-center text-[11px] font-semibold" style={{ color: TEXT_MUTED }}>{w}</span>
+            ))}
+          </div>
+        </div>
 
-      {/* Resumo geral */}
-      <p className="section-title">Esta semana</p>
-      <div className="grid grid-cols-2 gap-3 px-5 mb-4">
-        <div className="bg-card rounded-2xl border border-border p-4 text-center">
-          <div className="text-3xl font-black text-secondary">{completedTasks}</div>
-          <div className="text-xs text-muted mt-1">Tarefas concluídas</div>
-        </div>
-        <div className="bg-card rounded-2xl border border-border p-4 text-center">
-          <div className="text-3xl font-black text-accent">{weeklyStats?.count ?? 0}</div>
-          <div className="text-xs text-muted mt-1">Check-ups feitos</div>
-        </div>
+        {/* Histórico de Impacto */}
+        <p className="text-[13px] font-bold uppercase mb-4" style={{ color: NAVY, letterSpacing: "0.3px" }}>Histórico de Impacto</p>
+
+        {sortedHistory.length === 0 ? (
+          <p className="text-center text-[12.5px] font-medium py-6" style={{ color: TEXT_MUTED }}>
+            Faça seu check-up matinal para começar a registrar sua jornada. 🌿
+          </p>
+        ) : (
+          <div className="relative flex flex-col gap-4 pl-3">
+            <div className="absolute w-px" style={{ left: 4, top: 10, bottom: 10, background: LINE }} />
+            {sortedHistory.map(entry => {
+              const entryDate = new Date(entry.createdAt);
+              const isToday = dateKey(entryDate) === todayKey;
+              const completed = completedCountForDay(entryDate);
+              return (
+                <div key={entry.id} className="relative pl-4">
+                  <div className="absolute rounded-full" style={{ left: 0, top: 6, width: 9, height: 9, background: isToday ? SAGE : LINE, border: `2px solid ${BG_APP}` }} />
+                  <div className="bg-white rounded-2xl p-3.5" style={{ boxShadow: "0 2px 10px rgba(22,54,90,0.03)" }}>
+                    <p className="text-xs font-bold mb-1.5" style={{ color: NAVY }}>{relativeDayLabel(entryDate)}</p>
+                    <div className="flex gap-3 text-[11px] font-medium mb-2" style={{ color: TEXT_MUTED }}>
+                      <span>✅ <strong style={{ color: NAVY }}>{completed}</strong> concluídas</span>
+                      <span>⚡ Energia média: <strong style={{ color: NAVY }}>{entry.energyLevel}/5</strong></span>
+                    </div>
+                    {entry.notes && (
+                      <p className="text-xs italic leading-relaxed rounded-[10px] p-2.5 m-0" style={{ color: NAVY, background: "#FAFBF9" }}>
+                        "{entry.notes}"
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
