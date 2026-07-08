@@ -2,7 +2,7 @@
 @import "tailwindcss";
 
 @theme {
-  --color-background: #FDF5E6;
+  --color-background: #EEF3EC;
   --color-foreground: #1C1C1E;
   --color-card: #FFFFFF;
   --color-border: #E8DFD0;
@@ -14,22 +14,29 @@
   --radius: 0.75rem;
 }
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+/* Precisa estar em @layer base: uma regra fora de qualquer camada sempre
+   vence regras em camada, não importa a especificidade — e o Tailwind
+   coloca todas as classes utilitárias (px-6, mb-8, p-4...) em camadas
+   internas dele. Sem isso, este reset zera margin/padding de toda classe
+   utilitária do app inteiro, silenciosamente. */
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
 
-body {
-  font-family: "Montserrat", sans-serif;
-  background-color: #FDF5E6;
-  color: #1C1C1E;
-  -webkit-font-smoothing: antialiased;
-}
+  body {
+    font-family: "Montserrat", sans-serif;
+    background-color: var(--color-background);
+    color: #1C1C1E;
+    -webkit-font-smoothing: antialiased;
+  }
 
-h1, h2, h3, h4, h5, h6 {
-  font-family: "Montserrat", sans-serif;
-  font-weight: 700;
+  h1, h2, h3, h4, h5, h6 {
+    font-family: "Montserrat", sans-serif;
+    font-weight: 700;
+  }
 }
 
 /* ── Scrollbar hide ── */
@@ -41,7 +48,7 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background-color: #FDF5E6;
+  background-color: var(--color-background);
   padding-bottom: 80px;
 }
 

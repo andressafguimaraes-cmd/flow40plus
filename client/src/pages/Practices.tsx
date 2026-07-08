@@ -78,7 +78,7 @@ function PracticeSlides({ practice, onClose }: { practice: typeof STATIC_PRACTIC
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#FDF5E6] flex flex-col">
+    <div className="fixed inset-0 z-50 bg-background flex flex-col">
       {/* Progress bar */}
       <div className="h-1 bg-[#E8DFD0]">
         <div className="h-full bg-[#E67E22] transition-all" style={{ width: `${progress}%` }} />

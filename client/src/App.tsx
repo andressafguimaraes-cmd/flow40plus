@@ -78,7 +78,7 @@ function AppShell() {
   const isLegacyRoute = LEGACY_ROUTES.includes(location);
 
   return (
-    <div className="min-h-screen bg-[#FDF5E6]">
+    <div className="min-h-screen bg-background">
       {isTabRoute && (
         <SwipeableTabs
           location={location === "/" ? "/dashboard" : location}
