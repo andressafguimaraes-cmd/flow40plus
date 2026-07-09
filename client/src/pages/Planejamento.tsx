@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -80,6 +81,7 @@ export default function Planejamento() {
   const [unplannedOpen, setUnplannedOpen] = useState(true);
   const [timeModalTaskId, setTimeModalTaskId] = useState<number | null>(null);
   const [timeInput, setTimeInput] = useState("09:00");
+  const [dayPickerTaskId, setDayPickerTaskId] = useState<number | null>(null);
 
   const weekDates = getWeekDates(today, weekOffset);
   const monthLabel = `${MONTH_NAMES[weekDates[0].getMonth()]} ${weekDates[0].getFullYear()}`;
@@ -103,7 +105,6 @@ export default function Planejamento() {
 
   const selectedDateObj = new Date(`${selectedDate}T00:00:00`);
   const selectedLabel = `${WEEKDAYS_FULL[selectedDateObj.getDay()]}, ${selectedDateObj.getDate()} de ${MONTH_NAMES[selectedDateObj.getMonth()].toLowerCase()}`;
-  const selectedShort = `${selectedDateObj.getDate()}/${String(selectedDateObj.getMonth() + 1).padStart(2, "0")}`;
 
   const openTimeModal = (taskId: number, currentTime: string | null | undefined) => {
     setTimeInput(currentTime ?? "09:00");
@@ -116,20 +117,19 @@ export default function Planejamento() {
     setTimeModalTaskId(null);
   };
 
-  const handleAssignToSelected = (taskId: number) => {
-    setPlannedDate.mutate({ taskId, plannedDate: selectedDate });
-    toast.success(`Tarefa planejada para ${selectedShort}`);
+  const handleAssignToDay = (date: string) => {
+    if (dayPickerTaskId == null) return;
+    setPlannedDate.mutate({ taskId: dayPickerTaskId, plannedDate: date });
+    const d = new Date(`${date}T00:00:00`);
+    toast.success(`Tarefa planejada para ${d.getDate()}/${String(d.getMonth() + 1).padStart(2, "0")}`);
+    setDayPickerTaskId(null);
   };
 
   return (
     <div className="min-h-screen pb-24" style={{ background: BG_APP }}>
-      <div className="px-5 pt-6 pb-1">
-        <svg width="70" height="20" viewBox="0 0 70 20" fill="none">
-          <path d="M2 10C11 2 17 2 24 8C31 14 37 14 44 8" stroke={SAGE} strokeWidth="2" strokeLinecap="round" />
-          <path d="M2 15C11 9 18 9 24 13C30 17 37 15 44 11" stroke="#E8813A" strokeWidth="2" strokeLinecap="round" />
-        </svg>
-        <h1 className="text-[26px] font-bold mt-1.5" style={{ color: NAVY }}>Planejamento</h1>
-        <p className="text-[13px] font-medium mt-0.5 mb-5" style={{ color: TEXT_MUTED }}>Veja o equilíbrio da sua semana.</p>
+      <div className="px-5 pt-6">
+        <h1 className="text-[22px] font-bold" style={{ color: NAVY }}>Planejamento</h1>
+        <p className="text-[13px] font-medium mt-1 mb-6" style={{ color: TEXT_MUTED }}>Veja o equilíbrio da sua semana.</p>
       </div>
 
       {/* Mês + navegação de semana */}
@@ -286,7 +286,7 @@ export default function Planejamento() {
         </div>
         <div className="text-xs font-medium" style={{ color: TEXT_MUTED }}>
           <strong className="block text-[12.5px] mb-0.5" style={{ color: NAVY }}>Toque em uma tarefa sem data</strong>
-          para planejá-la para {selectedShort}
+          para escolher o dia em que ela será planejada
         </div>
       </div>
 
@@ -307,7 +307,7 @@ export default function Planejamento() {
               unplannedTasks.map(task => (
                 <button
                   key={task.id}
-                  onClick={() => handleAssignToSelected(task.id)}
+                  onClick={() => setDayPickerTaskId(task.id)}
                   className="flex items-center gap-2.5 bg-white rounded-xl px-3.5 py-2.5 text-left active:scale-[0.98] transition-all"
                 >
                   <span className="text-xs tracking-tighter" style={{ color: "#C4C9BF" }}>⠿⠿</span>
@@ -323,7 +323,7 @@ export default function Planejamento() {
       </div>
 
       {/* Modal: definir horário fixo (promover a âncora) */}
-      {timeModalTaskId != null && (
+      {timeModalTaskId != null && createPortal(
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40">
           <div className="w-full max-w-md bg-white rounded-t-3xl p-5">
             <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: LINE }} />
@@ -344,7 +344,45 @@ export default function Planejamento() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Modal: escolher dia para planejar tarefa sem data */}
+      {dayPickerTaskId != null && createPortal(
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={() => setDayPickerTaskId(null)}>
+          <div className="w-full max-w-md bg-white rounded-t-3xl p-5" onClick={e => e.stopPropagation()}>
+            <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: LINE }} />
+            <h3 className="text-base font-bold mb-1" style={{ color: NAVY }}>Planejar para qual dia?</h3>
+            <p className="text-xs font-medium mb-4" style={{ color: TEXT_MUTED }}>{monthLabel}</p>
+            <div className="grid grid-cols-7 gap-1.5 mb-4">
+              {weekDates.map((d, i) => {
+                const key = dateKey(d);
+                const isToday = key === dateKey(today);
+                const level = LOAD_LEVELS[getLoadLevel(getDayLoadMinutes(key))];
+                return (
+                  <button
+                    key={key}
+                    onClick={() => handleAssignToDay(key)}
+                    className="rounded-xl py-2.5 flex flex-col items-center gap-1"
+                    style={{ border: isToday ? `1.5px solid ${NAVY}` : `1px solid ${LINE}`, background: BG_APP }}
+                  >
+                    <span className="text-[9px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>{WEEKDAYS[i]}</span>
+                    <span className="text-sm font-bold" style={{ color: NAVY }}>{d.getDate()}</span>
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: level.dot }} />
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[11px] font-medium mb-4" style={{ color: TEXT_MUTED }}>
+              Para escolher outra semana, navegue pelas setas ‹ › antes de tocar na tarefa.
+            </p>
+            <button onClick={() => setDayPickerTaskId(null)} className="w-full h-11 rounded-2xl text-sm font-bold" style={{ border: `1px solid ${LINE}`, color: TEXT_MUTED }}>
+              Cancelar
+            </button>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
@@ -21,28 +22,49 @@ const PRIORITIES = [
 
 type PriorityKey = typeof PRIORITIES[number]["key"];
 
+const TIME_OPTIONS = [
+  { value: 15, label: "15 min" },
+  { value: 30, label: "30 min" },
+  { value: 45, label: "45 min" },
+  { value: 60, label: "1h" },
+  { value: 90, label: "1h 30min" },
+  { value: 120, label: "2h" },
+];
+const TIME_VALUES = TIME_OPTIONS.map(t => t.value);
+
 function priorityInfo(key: PriorityKey | null | undefined) {
   return PRIORITIES.find(p => p.key === (key ?? "sem")) ?? PRIORITIES[4];
 }
 
+function nearestTimeOption(minutes: number | null | undefined): number {
+  const target = minutes ?? 15;
+  return TIME_VALUES.reduce((prev, curr) => (Math.abs(curr - target) < Math.abs(prev - target) ? curr : prev));
+}
+
+interface EditModalState {
+  id: number;
+  title: string;
+  totalEstimatedTime: number;
+  priority: PriorityKey;
+}
+
 export default function Tasks() {
   const [taskInput, setTaskInput] = useState("");
-  const [timeInput, setTimeInput] = useState("");
+  const [timeInput, setTimeInput] = useState("60");
   const [priority, setPriority] = useState<PriorityKey>("sem");
   const [aiActive, setAiActive] = useState(false);
   const [filter, setFilter] = useState("todas");
   const [submitting, setSubmitting] = useState(false);
   const [listening, setListening] = useState(false);
   const [expandedTasks, setExpandedTasks] = useState<Record<number, boolean>>({});
-  const [editingTask, setEditingTask] = useState<number | null>(null);
-  const [editValue, setEditValue] = useState("");
+  const [editModalTask, setEditModalTask] = useState<EditModalState | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
 
   const { data: tasks, refetch } = trpc.tasks.list.useQuery();
 
   const resetCapture = () => {
     setTaskInput("");
-    setTimeInput("");
+    setTimeInput("60");
     setPriority("sem");
     setAiActive(false);
     setSubmitting(false);
@@ -59,6 +81,20 @@ export default function Tasks() {
   const updateStatus = trpc.tasks.updateTaskStatus.useMutation({ onSuccess: () => refetch() });
   const updateStep = trpc.tasks.updateMicroStepStatus.useMutation({ onSuccess: () => refetch() });
   const updatePriority = trpc.tasks.updatePriority.useMutation({ onSuccess: () => refetch() });
+  const updateTask = trpc.tasks.update.useMutation({
+    onSuccess: () => { toast.success("Tarefa atualizada!"); refetch(); setEditModalTask(null); },
+    onError: () => toast.error("Erro ao salvar alterações."),
+  });
+
+  const openEditModal = (task: NonNullable<typeof tasks>[number]) => {
+    setEditModalTask({
+      id: task.id,
+      title: task.title,
+      totalEstimatedTime: nearestTimeOption(task.totalEstimatedTime),
+      priority: (task.priority ?? "sem") as PriorityKey,
+    });
+    setMenuOpenId(null);
+  };
 
   const handleAdd = () => {
     const title = taskInput.trim();
@@ -87,8 +123,13 @@ export default function Tasks() {
       setTaskInput(text);
       const minMatch = text.match(/(\d+)\s*minuto/i);
       const hourMatch = text.match(/(\d+)\s*hora/i);
-      if (minMatch) setTimeInput(minMatch[1]);
-      else if (hourMatch) setTimeInput(String(parseInt(hourMatch[1], 10) * 60));
+      let minutes: number | null = null;
+      if (minMatch) minutes = parseInt(minMatch[1], 10);
+      else if (hourMatch) minutes = parseInt(hourMatch[1], 10) * 60;
+      if (minutes != null) {
+        const closest = TIME_VALUES.reduce((prev, curr) => (Math.abs(curr - minutes!) < Math.abs(prev - minutes!) ? curr : prev));
+        setTimeInput(String(closest));
+      }
     };
     recognition.onerror = () => toast.error("Erro no reconhecimento de voz.");
     recognition.onend = () => setListening(false);
@@ -109,7 +150,6 @@ export default function Tasks() {
   const renderTaskCard = (task: NonNullable<typeof tasks>[number]) => {
     const p = priorityInfo(task.priority);
     const done = task.status === "completed";
-    const isEditing = editingTask === task.id;
     const isMenuOpen = menuOpenId === task.id;
     const hasSteps = task.steps?.length > 0;
     const isExpanded = expandedTasks[task.id];
@@ -130,23 +170,12 @@ export default function Tasks() {
         </button>
 
         <div className="flex-1 min-w-0">
-          {isEditing ? (
-            <input
-              autoFocus value={editValue} onChange={e => setEditValue(e.target.value)}
-              onBlur={() => setEditingTask(null)}
-              onKeyDown={e => { if (e.key === "Enter" || e.key === "Escape") setEditingTask(null); }}
-              className="w-full text-sm rounded-lg px-2 py-1 outline-none mb-1.5"
-              style={{ border: `1px solid ${SAGE}`, color: NAVY }}
-            />
-          ) : (
-            <p
-              className="text-[14.5px] font-semibold mb-1.5 leading-snug"
-              style={{ color: done ? DONE_MUTED : NAVY, textDecoration: done ? "line-through" : "none" }}
-              onDoubleClick={() => { setEditingTask(task.id); setEditValue(task.title); }}
-            >
-              {task.title}
-            </p>
-          )}
+          <p
+            className="text-[14.5px] font-semibold mb-1.5 leading-snug"
+            style={{ color: done ? DONE_MUTED : NAVY, textDecoration: done ? "line-through" : "none" }}
+          >
+            {task.title}
+          </p>
 
           <div className="flex items-center gap-2 flex-wrap text-[11.5px] font-medium mb-2.5" style={{ color: TEXT_MUTED }}>
             <span className="px-2 py-0.5 rounded-[6px] text-[10.5px] font-semibold" style={{ background: p.tagBg, color: p.tagText }}>{p.label}</span>
@@ -195,8 +224,16 @@ export default function Tasks() {
         {isMenuOpen && (
           <div
             className="absolute rounded-2xl p-1.5 flex flex-col gap-0.5 z-10 bg-white"
-            style={{ top: 36, right: 10, width: 150, boxShadow: "0 8px 24px rgba(22,54,90,0.18)" }}
+            style={{ top: 36, right: 10, width: 170, boxShadow: "0 8px 24px rgba(22,54,90,0.18)" }}
           >
+            <button
+              onClick={e => { e.stopPropagation(); openEditModal(task); }}
+              className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-left text-[12.5px] font-medium"
+              style={{ color: NAVY }}
+            >
+              ✏️ Editar tarefa
+            </button>
+            <div style={{ height: 1, background: LINE, margin: "2px 4px" }} />
             {PRIORITIES.map(pr => (
               <button
                 key={pr.key}
@@ -220,7 +257,7 @@ export default function Tasks() {
         <h1 className="text-[22px] font-bold mb-4" style={{ color: NAVY }}>Tarefas</h1>
 
         {/* Captura rápida */}
-        <div className="flex flex-col gap-2 mb-2.5">
+        <div className="flex flex-col gap-2 mb-6">
           <div className="relative rounded-[14px] flex items-center px-3.5" style={{ background: BG_APP, border: `1px solid ${LINE}`, height: 44 }}>
             <input
               value={taskInput} onChange={e => setTaskInput(e.target.value)}
@@ -232,51 +269,50 @@ export default function Tasks() {
               {listening ? "🛑" : "🎙️"}
             </button>
           </div>
+
           <div className="flex gap-2">
-            <div className="rounded-[14px] flex items-center px-3.5 flex-shrink-0" style={{ background: BG_APP, border: `1px solid ${LINE}`, height: 44, width: 88 }}>
-              <input
+            <div className="flex-1 rounded-[14px] flex items-center px-3" style={{ background: BG_APP, border: `1px solid ${LINE}`, height: 44 }}>
+              <select
                 value={timeInput} onChange={e => setTimeInput(e.target.value)}
-                placeholder="Tempo"
-                className="w-full bg-transparent outline-none text-[13.5px]"
+                className="w-full bg-transparent outline-none text-[13px] font-medium appearance-none cursor-pointer"
                 style={{ color: NAVY }}
-              />
-            </div>
-            <button
-              onClick={handleAdd} disabled={submitting || !taskInput.trim()}
-              className="rounded-[14px] flex items-center justify-center text-lg font-semibold text-white flex-shrink-0 transition-all active:scale-95 disabled:opacity-50"
-              style={{ width: 44, height: 44, background: NAVY }}
-            >
-              +
-            </button>
-          </div>
-        </div>
-
-        {/* Seletor de prioridade */}
-        <div className="flex flex-wrap gap-1.5 mb-1">
-          {PRIORITIES.map(p => {
-            const selected = priority === p.key;
-            return (
-              <button
-                key={p.key} onClick={() => setPriority(p.key)}
-                className="px-2.5 py-1 rounded-full text-[11px] font-semibold"
-                style={{ background: p.tagBg, color: p.tagText, border: selected ? `1.3px solid ${p.tagText}` : "1.3px solid transparent" }}
               >
-                {p.label}
-              </button>
-            );
-          })}
-        </div>
+                {TIME_OPTIONS.map(t => (
+                  <option key={t.value} value={t.value}>⏱️ {t.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex-1 rounded-[14px] flex items-center px-3" style={{ background: BG_APP, border: `1px solid ${LINE}`, height: 44 }}>
+              <select
+                value={priority} onChange={e => setPriority(e.target.value as PriorityKey)}
+                className="w-full bg-transparent outline-none text-[13px] font-medium appearance-none cursor-pointer"
+                style={{ color: NAVY }}
+              >
+                {PRIORITIES.map(p => (
+                  <option key={p.key} value={p.key}>🏳️ {p.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
 
-        {/* Toggle IA */}
-        <button
-          onClick={() => setAiActive(v => !v)}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs mb-5 w-fit"
-          style={aiActive
-            ? { color: SAGE_DARK, border: `1.3px solid ${SAGE}`, background: "#E4EFE6", fontWeight: 600 }
-            : { color: TEXT_MUTED, border: "1.3px solid transparent", fontWeight: 500 }}
-        >
-          <span style={{ color: SAGE_DARK }}>✨</span> Deixar a IA decompor em micro-passos
-        </button>
+          <button
+            onClick={() => setAiActive(v => !v)}
+            className="flex items-center gap-2 rounded-[14px] px-3.5 text-[12.5px]"
+            style={aiActive
+              ? { height: 44, color: SAGE_DARK, border: `1px solid ${SAGE}`, background: "#E4EFE6", fontWeight: 600 }
+              : { height: 44, color: TEXT_MUTED, border: `1px solid ${LINE}`, background: BG_APP, fontWeight: 500 }}
+          >
+            <span style={{ color: SAGE_DARK, fontSize: 14 }}>✨</span> Decompor com Inteligência Artificial
+          </button>
+
+          <button
+            onClick={handleAdd} disabled={submitting || !taskInput.trim()}
+            className="w-full rounded-[14px] text-white text-sm font-semibold transition-all active:scale-[0.98] disabled:opacity-50"
+            style={{ height: 46, background: NAVY }}
+          >
+            + Adicionar
+          </button>
+        </div>
 
         {/* Tabs */}
         <div className="flex gap-5 overflow-x-auto mb-6" style={{ borderBottom: `1px solid ${LINE}` }}>
@@ -314,6 +350,82 @@ export default function Tasks() {
           </div>
         )}
       </div>
+
+      {/* Modal: Editar tarefa */}
+      {editModalTask && createPortal(
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center"
+          style={{ background: "rgba(22,54,90,0.4)" }}
+          onClick={e => { e.stopPropagation(); setEditModalTask(null); }}
+        >
+          <div className="w-full max-w-md bg-white rounded-t-3xl p-5" onClick={e => e.stopPropagation()}>
+            <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: LINE }} />
+            <h3 className="text-base font-bold mb-4" style={{ color: NAVY }}>Editar tarefa</h3>
+
+            <label className="text-xs font-semibold mb-1.5 block" style={{ color: TEXT_MUTED }}>Nome da tarefa</label>
+            <input
+              value={editModalTask.title}
+              onChange={e => setEditModalTask(prev => (prev ? { ...prev, title: e.target.value } : prev))}
+              className="w-full text-sm rounded-xl px-3.5 py-2.5 outline-none mb-4"
+              style={{ border: `1px solid ${LINE}`, color: NAVY, background: BG_APP }}
+            />
+
+            <div className="flex gap-2 mb-5">
+              <div className="flex-1 rounded-xl flex items-center px-3" style={{ background: BG_APP, border: `1px solid ${LINE}`, height: 44 }}>
+                <select
+                  value={editModalTask.totalEstimatedTime}
+                  onChange={e => setEditModalTask(prev => (prev ? { ...prev, totalEstimatedTime: Number(e.target.value) } : prev))}
+                  className="w-full bg-transparent outline-none text-[13px] font-medium appearance-none cursor-pointer"
+                  style={{ color: NAVY }}
+                >
+                  {TIME_OPTIONS.map(t => (
+                    <option key={t.value} value={t.value}>⏱️ {t.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex-1 rounded-xl flex items-center px-3" style={{ background: BG_APP, border: `1px solid ${LINE}`, height: 44 }}>
+                <select
+                  value={editModalTask.priority}
+                  onChange={e => setEditModalTask(prev => (prev ? { ...prev, priority: e.target.value as PriorityKey } : prev))}
+                  className="w-full bg-transparent outline-none text-[13px] font-medium appearance-none cursor-pointer"
+                  style={{ color: NAVY }}
+                >
+                  {PRIORITIES.map(p => (
+                    <option key={p.key} value={p.key}>🏳️ {p.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setEditModalTask(null)}
+                className="flex-1 h-11 rounded-2xl text-sm font-bold"
+                style={{ border: `1px solid ${LINE}`, color: TEXT_MUTED }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  if (!editModalTask.title.trim()) return;
+                  updateTask.mutate({
+                    taskId: editModalTask.id,
+                    title: editModalTask.title.trim(),
+                    totalEstimatedTime: editModalTask.totalEstimatedTime,
+                    priority: editModalTask.priority,
+                  });
+                }}
+                disabled={!editModalTask.title.trim() || updateTask.isPending}
+                className="flex-1 h-11 rounded-2xl text-white text-sm font-bold disabled:opacity-50"
+                style={{ background: SAGE }}
+              >
+                {updateTask.isPending ? "Salvando..." : "Salvar"}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

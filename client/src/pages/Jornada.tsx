@@ -85,7 +85,7 @@ export default function Jornada() {
             </div>
           </div>
 
-          <div className="flex items-end justify-between px-2" style={{ height: 120, borderBottom: `1px solid ${LINE}` }}>
+          <div className="relative flex items-end justify-between px-2" style={{ height: 120, borderBottom: `1px solid ${LINE}` }}>
             {weekDates.map((d, i) => {
               const count = dayCounts[i];
               const barHeight = count > 0 ? Math.max((count / maxCount) * 95, 10) : 3;
@@ -98,13 +98,47 @@ export default function Jornada() {
                     {dotBottom != null && (
                       <div
                         className="absolute rounded-full"
-                        style={{ width: 6, height: 6, background: ORANGE, left: "50%", bottom: dotBottom, transform: "translateX(-50%)", boxShadow: "0 0 0 3px rgba(232,129,58,0.2)" }}
+                        style={{ width: 6, height: 6, background: ORANGE, left: "50%", bottom: dotBottom, transform: "translateX(-50%)", boxShadow: "0 0 0 3px rgba(232,129,58,0.2)", zIndex: 1 }}
                       />
                     )}
                   </div>
                 </div>
               );
             })}
+
+            {/* Linha conectando os pontos de energia */}
+            {(() => {
+              const points = weekDates
+                .map((d, i) => {
+                  const energia = energyForDay(d);
+                  if (energia == null) return null;
+                  const dotBottom = 18 + ((energia - 1) / 4) * 90;
+                  const x = (i + 0.5) * (100 / 5);
+                  const y = 120 - (dotBottom + 3);
+                  return { x, y };
+                })
+                .filter((p): p is { x: number; y: number } => p != null);
+              if (points.length < 2) return null;
+              return (
+                <svg
+                  className="absolute inset-0 pointer-events-none"
+                  width="100%"
+                  height="100%"
+                  viewBox="0 0 100 120"
+                  preserveAspectRatio="none"
+                >
+                  <polyline
+                    points={points.map(p => `${p.x},${p.y}`).join(" ")}
+                    fill="none"
+                    stroke={ORANGE}
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                </svg>
+              );
+            })()}
           </div>
           <div className="flex justify-between px-2 pt-2">
             {WEEKDAYS_SHORT.map((w, i) => (

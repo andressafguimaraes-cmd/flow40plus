@@ -293,6 +293,19 @@ export async function updateTaskPriority(taskId: number, priority: "urgente" | "
   await db.update(tasks).set({ priority, updatedAt: new Date() }).where(eq(tasks.id, taskId));
 }
 
+export async function updateTaskDetails(taskId: number, updates: { title?: string; totalEstimatedTime?: number; priority?: "urgente" | "alta" | "media" | "baixa" | "sem" }) {
+  const db = await getDb();
+  if (!db) {
+    if (useMemoryFallback) {
+      memoryDb.updateTaskDetails(taskId, updates);
+      return;
+    }
+    throw new Error("Database not available");
+  }
+
+  await db.update(tasks).set({ ...updates, updatedAt: new Date() }).where(eq(tasks.id, taskId));
+}
+
 export async function deleteTask(taskId: number) {
   const db = await getDb();
   if (!db) {

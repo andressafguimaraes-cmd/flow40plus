@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
 
 interface Clause {
   title: string;
@@ -119,14 +118,13 @@ const PRIVACIDADE_CLAUSES: Clause[] = [
 ];
 
 export default function Termos() {
-  const [, setLocation] = useLocation();
   const [tab, setTab] = useState<"termos" | "privacidade">("termos");
   const clauses = tab === "termos" ? TERMOS_CLAUSES : PRIVACIDADE_CLAUSES;
 
   return (
     <div className="min-h-screen bg-background pb-10">
       <div className="px-5 pt-6 pb-4">
-        <button onClick={() => setLocation("/")} className="text-sm text-muted mb-4">
+        <button onClick={() => window.history.back()} className="text-sm text-muted mb-4">
           ‹ Voltar
         </button>
         <h1 className="text-2xl font-light text-secondary">Termos & Privacidade</h1>

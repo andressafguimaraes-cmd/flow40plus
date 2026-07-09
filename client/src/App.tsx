@@ -61,9 +61,9 @@ function AppShell() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
+        <div className="flex flex-col items-center">
           <Logo size="md" showManifesto={false} className="mb-6" />
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent mx-auto"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
         </div>
       </div>
     );

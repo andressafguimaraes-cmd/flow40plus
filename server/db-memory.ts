@@ -203,6 +203,14 @@ class InMemoryDatabase {
     }
   }
 
+  updateTaskDetails(taskId: number, updates: { title?: string; totalEstimatedTime?: number; priority?: 'urgente' | 'alta' | 'media' | 'baixa' | 'sem' }) {
+    const task = this.tasks.get(taskId);
+    if (task) {
+      Object.assign(task, updates);
+      task.updatedAt = new Date();
+    }
+  }
+
   deleteTask(taskId: number) {
     // Delete micro-steps first
     const microStepsToDelete = Array.from(this.microSteps.values())

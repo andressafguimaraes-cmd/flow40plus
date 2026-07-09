@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "flow40plus-dev",
+      "runtimeExecutable": "node_modules/.bin/tsx",
+      "runtimeArgs": ["watch", "server/_core/index.ts"],
+      "port": 3000
+    }
+  ]
+}

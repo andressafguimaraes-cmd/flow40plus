@@ -43,13 +43,17 @@ export default function Login() {
 
   return (
     <div className="min-h-dvh flex items-center justify-center px-5 py-10 relative overflow-hidden" style={{ background: NAVY }}>
-      {/* Ondas decorativas de fundo */}
-      <svg className="absolute top-0 left-0 w-24 h-56 opacity-50 pointer-events-none" viewBox="0 0 60 220" fill="none">
-        <path d="M40 0 C10 40, 55 80, 20 120 C-5 150, 30 190, 15 220" stroke={ORANGE} strokeWidth="1.4" fill="none" />
+      {/* Ondas decorativas de fundo — a verde é a onda laranja espelhada (rotação de 180°),
+          para as duas lerem como um par simétrico, não elementos soltos. */}
+      <svg className="absolute top-0 left-0 w-28 h-52 opacity-50 pointer-events-none" viewBox="0 0 100 200" fill="none">
+        <path d="M65 0 C30 35, 80 70, 40 105 C0 135, 45 170, 30 200" stroke={ORANGE} strokeWidth="1.4" fill="none" />
+        <path d="M14 22 l6 -6 M20 16 l6 6 M20 28 l-6 -6" stroke={ORANGE} strokeWidth="1.4" fill="none" strokeLinecap="round" />
       </svg>
-      <svg className="absolute bottom-0 right-0 w-36 h-56 opacity-50 pointer-events-none" viewBox="0 0 140 220" fill="none">
-        <path d="M140 40 C100 70, 130 110, 90 140 C60 165, 80 200, 40 220" stroke={SAGE} strokeWidth="1.4" fill="none" />
-        <path d="M118 190 l6 -6 M124 184 l6 6 M124 196 l-6 -6" stroke={SAGE} strokeWidth="1.4" fill="none" strokeLinecap="round" />
+      <svg className="absolute bottom-0 right-0 w-28 h-52 opacity-50 pointer-events-none" viewBox="0 0 100 200" fill="none">
+        <g transform="rotate(180 50 100)">
+          <path d="M65 0 C30 35, 80 70, 40 105 C0 135, 45 170, 30 200" stroke={SAGE} strokeWidth="1.4" fill="none" />
+          <path d="M14 22 l6 -6 M20 16 l6 6 M20 28 l-6 -6" stroke={SAGE} strokeWidth="1.4" fill="none" strokeLinecap="round" />
+        </g>
       </svg>
 
       <div className="w-full max-w-sm relative z-10">

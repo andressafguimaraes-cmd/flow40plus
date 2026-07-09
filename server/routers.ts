@@ -212,6 +212,19 @@ export const appRouter = router({
         return { success: true };
       }),
 
+    update: publicProcedure
+      .input(z.object({
+        taskId: z.number(),
+        title: z.string().min(1).max(500).optional(),
+        totalEstimatedTime: z.number().optional(),
+        priority: z.enum(["urgente", "alta", "media", "baixa", "sem"]).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { taskId, ...updates } = input;
+        await db.updateTaskDetails(taskId, updates);
+        return { success: true };
+      }),
+
     checkPriorityLimit: publicProcedure
       .query(async ({ ctx }) => {
         if (!ctx.user) {
@@ -236,10 +249,22 @@ export const appRouter = router({
         try {
           const prompt = `You are a productivity expert helping women over 40 break down complex tasks into manageable micro-steps.
 
+CRITICAL: Respond entirely in the SAME language as the task below. If the task is written in Portuguese, every title and description in your answer must be in Portuguese too.
+
 Task: ${input.taskDescription}
 ${input.context ? `Context: ${input.context}` : ""}
 
-Decompose this task into AT MOST 6 specific, actionable micro-steps (fewer is fine for simple tasks). Keep titles short and descriptions direct — one concise sentence each. Respond in the SAME language as the task above. For each step, provide:
+Before deciding how many steps to use, judge the real complexity of THIS SPECIFIC task. Do not default to a fixed number — most tasks need far fewer than the ceiling. 6 is a hard ceiling, never a target:
+- Simple, single-action tasks (e.g. "call the dentist", "buy milk", "send one email"): exactly 2 steps. Never split a single phone call or single errand into more than 2 steps.
+- Medium tasks with a few distinct parts (e.g. "organize the pantry", "reply to pending emails"): 3 to 4 steps.
+- Genuinely complex, multi-stage tasks (e.g. "plan a trip", "prepare an important presentation"): 5 to 6 steps.
+Use the smallest number of steps that still represents the task clearly — never pad the list to reach 6.
+
+Example of a correctly-sized simple task ("Ligar para o dentista e marcar consulta"):
+{"steps": [{"title": "Encontrar o número e ligar", "description": "Localize o contato do consultório e faça a ligação.", "estimatedTime": 5, "difficulty": "easy"}, {"title": "Marcar e confirmar horário", "description": "Escolha um horário disponível e confirme a consulta.", "estimatedTime": 5, "difficulty": "easy"}], "totalEstimatedTime": 10, "overallDifficulty": "easy"}
+Notice this example has only 2 steps, not 6 — match this level of restraint whenever the real task is similarly simple.
+
+Keep titles short and descriptions direct — one concise sentence each. For each step, provide:
 1. A short, clear title
 2. A brief, direct description (max 1 sentence)
 3. Estimated time in minutes (be realistic for women 40+ who may have energy fluctuations)
