@@ -21,7 +21,11 @@ export async function getDb() {
   }
 
   try {
-    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    // Capped at a handful of connections: on serverless (Vercel), every
+    // concurrent invocation can spin up its own Pool, so a high per-instance
+    // max risks exhausting Postgres' connection limit fast. Use Supabase's
+    // pooled (pgbouncer) connection string in DATABASE_URL on Vercel.
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 3 });
     _db = drizzle(pool);
     useMemoryFallback = false;
     console.log("[Database] Connected to Postgres");
