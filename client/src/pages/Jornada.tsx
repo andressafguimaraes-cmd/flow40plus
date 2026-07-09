@@ -1,12 +1,9 @@
 import { trpc } from "@/lib/trpc";
+import { useThemeColors } from "@/hooks/useThemeColors";
 
 // Paleta específica desta tela (mockup fornecido)
-const NAVY = "#16365A";
 const SAGE = "#5FA37A";
 const ORANGE = "#E8813A";
-const BG_APP = "#EEF3EC";
-const TEXT_MUTED = "#8C948C";
-const LINE = "#E7E5DE";
 
 const WEEKDAYS_SHORT = ["S", "T", "Q", "Q", "S"]; // Seg a Sex
 const WEEKDAYS_FULL = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
@@ -44,6 +41,8 @@ function relativeDayLabel(date: Date): string {
 }
 
 export default function Jornada() {
+  const { NAVY, BG_APP, CARD, TEXT_MUTED, LINE, isDark } = useThemeColors();
+  const NOTE_BG = isDark ? "#22332B" : "#FAFBF9";
   const { data: history } = trpc.checkIns.getHistory.useQuery();
   const { data: tasks } = trpc.tasks.list.useQuery();
 
@@ -76,7 +75,7 @@ export default function Jornada() {
         <p className="text-[13px] font-medium mt-1 mb-6" style={{ color: TEXT_MUTED }}>O registro visual da sua constância e equilíbrio.</p>
 
         {/* Gráfico semanal */}
-        <div className="bg-white rounded-[20px] p-5 mb-6" style={{ boxShadow: "0 2px 12px rgba(22,54,90,0.04)" }}>
+        <div className="rounded-[20px] p-5 mb-6" style={{ background: CARD, boxShadow: "0 2px 12px rgba(22,54,90,0.04)" }}>
           <div className="flex items-center justify-between mb-5">
             <span className="text-sm font-bold" style={{ color: NAVY }}>Visão Semanal</span>
             <div className="flex gap-3 text-[11px] font-semibold" style={{ color: NAVY }}>
@@ -164,14 +163,14 @@ export default function Jornada() {
               return (
                 <div key={entry.id} className="relative pl-4">
                   <div className="absolute rounded-full" style={{ left: 0, top: 6, width: 9, height: 9, background: isToday ? SAGE : LINE, border: `2px solid ${BG_APP}` }} />
-                  <div className="bg-white rounded-2xl p-3.5" style={{ boxShadow: "0 2px 10px rgba(22,54,90,0.03)" }}>
+                  <div className="rounded-2xl p-3.5" style={{ background: CARD, boxShadow: "0 2px 10px rgba(22,54,90,0.03)" }}>
                     <p className="text-xs font-bold mb-1.5" style={{ color: NAVY }}>{relativeDayLabel(entryDate)}</p>
                     <div className="flex gap-3 text-[11px] font-medium mb-2" style={{ color: TEXT_MUTED }}>
                       <span>✅ <strong style={{ color: NAVY }}>{completed}</strong> concluídas</span>
                       <span>⚡ Energia média: <strong style={{ color: NAVY }}>{entry.energyLevel}/5</strong></span>
                     </div>
                     {entry.notes && (
-                      <p className="text-xs italic leading-relaxed rounded-[10px] p-2.5 m-0" style={{ color: NAVY, background: "#FAFBF9" }}>
+                      <p className="text-xs italic leading-relaxed rounded-[10px] p-2.5 m-0" style={{ color: NAVY, background: NOTE_BG }}>
                         "{entry.notes}"
                       </p>
                     )}

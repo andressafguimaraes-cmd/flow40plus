@@ -3,14 +3,11 @@ import { createPortal } from "react-dom";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { useThemeColors } from "@/hooks/useThemeColors";
 
 // Paleta específica desta tela (mockup fornecido)
-const NAVY = "#16365A";
 const SAGE = "#5FA37A";
 const SAGE_DARK = "#3F8A63";
-const TEXT_MUTED = "#8C948C";
-const LINE = "#E7E5DE";
-const BG_APP = "#EEF3EC";
 
 const LOAD_LEVELS = {
   livre: { label: "Livre", dot: "#BEC3BA", bg: "#EDECE6", icon: "🌿" },
@@ -70,6 +67,7 @@ function getLoadLevel(totalMinutes: number): LoadLevelKey {
 
 export default function Planejamento() {
   const [, setLocation] = useLocation();
+  const { NAVY, BG_APP, CARD, TEXT_MUTED, LINE } = useThemeColors();
   const { data: tasks, refetch } = trpc.tasks.list.useQuery();
   const updateStatus = trpc.tasks.updateTaskStatus.useMutation({ onSuccess: () => refetch() });
   const setScheduledTime = trpc.tasks.setScheduledTime.useMutation({ onSuccess: () => refetch() });
@@ -91,7 +89,9 @@ export default function Planejamento() {
   const unplannedTasks = allTasks.filter(t => !t.plannedDate);
 
   const getDayLoadMinutes = (date: string) =>
-    tasksByDate(date).reduce((sum, t) => sum + (t.totalEstimatedTime ?? 0), 0);
+    tasksByDate(date)
+      .filter(t => t.status !== "completed")
+      .reduce((sum, t) => sum + (t.totalEstimatedTime ?? 0), 0);
 
   const dayTasksAll = tasksByDate(selectedDate);
   const anchors = [...dayTasksAll]
@@ -138,15 +138,15 @@ export default function Planejamento() {
         <div className="flex gap-2">
           <button
             onClick={() => setWeekOffset(o => Math.max(0, o - 1))}
-            className="w-7 h-7 rounded-full bg-white flex items-center justify-center text-sm"
-            style={{ border: `1px solid ${LINE}`, color: NAVY }}
+            className="w-7 h-7 rounded-full flex items-center justify-center text-sm"
+            style={{ background: CARD, border: `1px solid ${LINE}`, color: NAVY }}
           >
             ‹
           </button>
           <button
             onClick={() => setWeekOffset(o => o + 1)}
-            className="w-7 h-7 rounded-full bg-white flex items-center justify-center text-sm"
-            style={{ border: `1px solid ${LINE}`, color: NAVY }}
+            className="w-7 h-7 rounded-full flex items-center justify-center text-sm"
+            style={{ background: CARD, border: `1px solid ${LINE}`, color: NAVY }}
           >
             ›
           </button>
@@ -163,8 +163,8 @@ export default function Planejamento() {
             <button
               key={key}
               onClick={() => setSelectedDate(key)}
-              className="flex-shrink-0 w-[50px] py-2.5 rounded-2xl bg-white flex flex-col items-center gap-1"
-              style={{ boxShadow: "0 2px 8px rgba(22,54,90,0.05)", border: isSelected ? `1.5px solid ${NAVY}` : "1.5px solid transparent" }}
+              className="flex-shrink-0 w-[50px] py-2.5 rounded-2xl flex flex-col items-center gap-1"
+              style={{ background: CARD, boxShadow: "0 2px 8px rgba(22,54,90,0.05)", border: isSelected ? `1.5px solid ${NAVY}` : "1.5px solid transparent" }}
             >
               <span className="text-[10px] font-semibold uppercase" style={{ color: TEXT_MUTED }}>{WEEKDAYS[i]}</span>
               <span className="text-base font-bold" style={{ color: NAVY }}>{d.getDate()}</span>
@@ -214,7 +214,7 @@ export default function Planejamento() {
           <p className="text-center text-[12.5px] font-medium py-2" style={{ color: TEXT_MUTED }}>Nenhuma âncora fixa para este dia.</p>
         ) : (
           anchors.map(task => (
-            <div key={task.id} className="flex items-center gap-3.5 bg-white rounded-2xl px-4 py-3 mb-2.5" style={{ boxShadow: "0 2px 8px rgba(22,54,90,0.04)" }}>
+            <div key={task.id} className="flex items-center gap-3.5 rounded-2xl px-4 py-3 mb-2.5" style={{ background: CARD, boxShadow: "0 2px 8px rgba(22,54,90,0.04)" }}>
               <span className="text-[13.5px] font-bold flex-shrink-0" style={{ color: NAVY, minWidth: 48 }}>{task.scheduledTime}</span>
               <span className={`text-[13.5px] font-semibold flex-1 truncate ${task.status === "completed" ? "line-through opacity-50" : ""}`} style={{ color: NAVY }}>
                 {task.title}
@@ -249,7 +249,7 @@ export default function Planejamento() {
             const style = PRIORITY_STYLES[task.priority ?? "sem"] ?? PRIORITY_STYLES.sem;
             const done = task.status === "completed";
             return (
-              <div key={task.id} className="relative bg-white rounded-2xl pl-[18px] pr-4 py-3.5 flex gap-3 items-start" style={{ boxShadow: "0 2px 10px rgba(22,54,90,0.05)" }}>
+              <div key={task.id} className="relative rounded-2xl pl-[18px] pr-4 py-3.5 flex gap-3 items-start" style={{ background: CARD, boxShadow: "0 2px 10px rgba(22,54,90,0.05)" }}>
                 <span className="absolute left-0 top-3.5 bottom-3.5 w-[3px] rounded-[3px]" style={{ background: style.accent }} />
                 <button
                   onClick={() => updateStatus.mutate({ taskId: task.id, status: done ? "pending" : "completed" })}
@@ -295,7 +295,7 @@ export default function Planejamento() {
         <button onClick={() => setUnplannedOpen(o => !o)} className="w-full flex items-center justify-between mb-2.5">
           <div className="flex items-center gap-2">
             <span className="text-sm font-bold" style={{ color: NAVY }}>Tarefas sem data</span>
-            <span className="text-[11px] font-bold px-2 rounded-full bg-white" style={{ color: SAGE_DARK }}>{unplannedTasks.length}</span>
+            <span className="text-[11px] font-bold px-2 rounded-full" style={{ background: CARD, color: SAGE_DARK }}>{unplannedTasks.length}</span>
           </div>
           <span className="text-xs transition-transform" style={{ color: TEXT_MUTED, transform: unplannedOpen ? "rotate(180deg)" : "none" }}>▾</span>
         </button>
@@ -308,7 +308,8 @@ export default function Planejamento() {
                 <button
                   key={task.id}
                   onClick={() => setDayPickerTaskId(task.id)}
-                  className="flex items-center gap-2.5 bg-white rounded-xl px-3.5 py-2.5 text-left active:scale-[0.98] transition-all"
+                  className="flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-left active:scale-[0.98] transition-all"
+                  style={{ background: CARD }}
                 >
                   <span className="text-xs tracking-tighter" style={{ color: "#C4C9BF" }}>⠿⠿</span>
                   <span className="flex-1 text-[13px] font-semibold truncate" style={{ color: NAVY }}>{task.title}</span>
@@ -325,7 +326,7 @@ export default function Planejamento() {
       {/* Modal: definir horário fixo (promover a âncora) */}
       {timeModalTaskId != null && createPortal(
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40">
-          <div className="w-full max-w-md bg-white rounded-t-3xl p-5">
+          <div className="w-full max-w-md rounded-t-3xl p-5" style={{ background: CARD }}>
             <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: LINE }} />
             <h3 className="text-base font-bold mb-4" style={{ color: NAVY }}>Definir horário fixo</h3>
             <input
@@ -351,7 +352,7 @@ export default function Planejamento() {
       {/* Modal: escolher dia para planejar tarefa sem data */}
       {dayPickerTaskId != null && createPortal(
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={() => setDayPickerTaskId(null)}>
-          <div className="w-full max-w-md bg-white rounded-t-3xl p-5" onClick={e => e.stopPropagation()}>
+          <div className="w-full max-w-md rounded-t-3xl p-5" style={{ background: CARD }} onClick={e => e.stopPropagation()}>
             <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: LINE }} />
             <h3 className="text-base font-bold mb-1" style={{ color: NAVY }}>Planejar para qual dia?</h3>
             <p className="text-xs font-medium mb-4" style={{ color: TEXT_MUTED }}>{monthLabel}</p>

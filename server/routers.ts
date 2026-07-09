@@ -25,6 +25,104 @@ async function createSessionCookie(userId: number, ctx: Pick<TrpcContext, "req" 
   ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 }
 
+// Calls the AI to break a task description into micro-steps. Shared by the
+// "create + decompose" flow and the "decompose an already-created task" flow.
+async function decomposeTaskWithAI(taskDescription: string, context: string) {
+  const prompt = `You are a productivity expert helping women over 40 break down complex tasks into manageable micro-steps.
+
+CRITICAL: Respond entirely in the SAME language as the task below. If the task is written in Portuguese, every title and description in your answer must be in Portuguese too.
+
+Task: ${taskDescription}
+${context ? `Context: ${context}` : ""}
+
+Before deciding how many steps to use, judge the real complexity of THIS SPECIFIC task. Do not default to a fixed number — most tasks need far fewer than the ceiling. 6 is a hard ceiling, never a target:
+- Simple, single-action tasks (e.g. "call the dentist", "buy milk", "send one email"): exactly 2 steps. Never split a single phone call or single errand into more than 2 steps.
+- Medium tasks with a few distinct parts (e.g. "organize the pantry", "reply to pending emails"): 3 to 4 steps.
+- Genuinely complex, multi-stage tasks (e.g. "plan a trip", "prepare an important presentation"): 5 to 6 steps.
+Use the smallest number of steps that still represents the task clearly — never pad the list to reach 6.
+
+Example of a correctly-sized simple task ("Ligar para o dentista e marcar consulta"):
+{"steps": [{"title": "Encontrar o número e ligar", "description": "Localize o contato do consultório e faça a ligação.", "estimatedTime": 5, "difficulty": "easy"}, {"title": "Marcar e confirmar horário", "description": "Escolha um horário disponível e confirme a consulta.", "estimatedTime": 5, "difficulty": "easy"}], "totalEstimatedTime": 10, "overallDifficulty": "easy"}
+Notice this example has only 2 steps, not 6 — match this level of restraint whenever the real task is similarly simple.
+
+Keep titles short and descriptions direct — one concise sentence each. For each step, provide:
+1. A short, clear title
+2. A brief, direct description (max 1 sentence)
+3. Estimated time in minutes (be realistic for women 40+ who may have energy fluctuations)
+4. Difficulty level (easy, medium, hard)
+
+Return the response as a JSON object with this structure:
+{
+  "steps": [
+    {
+      "title": "Step title",
+      "description": "What to do",
+      "estimatedTime": 15,
+      "difficulty": "easy"
+    }
+  ],
+  "totalEstimatedTime": 120,
+  "overallDifficulty": "medium"
+}
+
+IMPORTANT: Respond ONLY with valid JSON. No markdown. No explanation. No extra text.
+`;
+
+  const response = await invokeLLM({
+    model: "gemini-flash-lite-latest",
+    reasoningEffort: "none",
+    messages: [{
+      role: "user",
+      content: prompt,
+    }],
+    maxTokens: 2000,
+  });
+
+  // Extract the text content from the response
+  const responseText = response.choices[0]?.message.content;
+  if (typeof responseText !== 'string') {
+    throw new Error("Invalid response format from AI");
+  }
+
+  // Parse the response with validation
+  let decomposition;
+  try {
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error("No JSON found in response");
+    }
+    decomposition = JSON.parse(jsonMatch[0]);
+  } catch (e) {
+    console.log("RAW AI RESPONSE:", responseText);
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        decomposition = JSON.parse(jsonMatch[0]);
+      } catch (parseError) {
+        throw new Error("Failed to parse extracted JSON from AI response");
+      }
+    } else {
+      throw new Error("Failed to parse AI response - no JSON found");
+    }
+  }
+
+  // Validate decomposition structure
+  if (!decomposition.steps || !Array.isArray(decomposition.steps)) {
+    throw new Error("Invalid decomposition format: missing steps array");
+  }
+  if (decomposition.steps.length === 0) {
+    throw new Error("AI returned empty steps array");
+  }
+  if (!decomposition.totalEstimatedTime || typeof decomposition.totalEstimatedTime !== "number") {
+    throw new Error("Invalid decomposition format: missing totalEstimatedTime");
+  }
+  if (!decomposition.overallDifficulty) {
+    throw new Error("Invalid decomposition format: missing overallDifficulty");
+  }
+
+  return decomposition;
+}
+
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -247,103 +345,12 @@ export const appRouter = router({
       }))
       .mutation(async ({ ctx, input }) => {
         try {
-          const prompt = `You are a productivity expert helping women over 40 break down complex tasks into manageable micro-steps.
-
-CRITICAL: Respond entirely in the SAME language as the task below. If the task is written in Portuguese, every title and description in your answer must be in Portuguese too.
-
-Task: ${input.taskDescription}
-${input.context ? `Context: ${input.context}` : ""}
-
-Before deciding how many steps to use, judge the real complexity of THIS SPECIFIC task. Do not default to a fixed number — most tasks need far fewer than the ceiling. 6 is a hard ceiling, never a target:
-- Simple, single-action tasks (e.g. "call the dentist", "buy milk", "send one email"): exactly 2 steps. Never split a single phone call or single errand into more than 2 steps.
-- Medium tasks with a few distinct parts (e.g. "organize the pantry", "reply to pending emails"): 3 to 4 steps.
-- Genuinely complex, multi-stage tasks (e.g. "plan a trip", "prepare an important presentation"): 5 to 6 steps.
-Use the smallest number of steps that still represents the task clearly — never pad the list to reach 6.
-
-Example of a correctly-sized simple task ("Ligar para o dentista e marcar consulta"):
-{"steps": [{"title": "Encontrar o número e ligar", "description": "Localize o contato do consultório e faça a ligação.", "estimatedTime": 5, "difficulty": "easy"}, {"title": "Marcar e confirmar horário", "description": "Escolha um horário disponível e confirme a consulta.", "estimatedTime": 5, "difficulty": "easy"}], "totalEstimatedTime": 10, "overallDifficulty": "easy"}
-Notice this example has only 2 steps, not 6 — match this level of restraint whenever the real task is similarly simple.
-
-Keep titles short and descriptions direct — one concise sentence each. For each step, provide:
-1. A short, clear title
-2. A brief, direct description (max 1 sentence)
-3. Estimated time in minutes (be realistic for women 40+ who may have energy fluctuations)
-4. Difficulty level (easy, medium, hard)
-
-Return the response as a JSON object with this structure:
-{
-  "steps": [
-    {
-      "title": "Step title",
-      "description": "What to do",
-      "estimatedTime": 15,
-      "difficulty": "easy"
-    }
-  ],
-  "totalEstimatedTime": 120,
-  "overallDifficulty": "medium"
-}
-
-IMPORTANT: Respond ONLY with valid JSON. No markdown. No explanation. No extra text.
-`;
-
-          const response = await invokeLLM({
-            model: "gemini-2.5-flash-lite",
-            reasoningEffort: "none",
-            messages: [{
-              role: "user",
-              content: prompt,
-            }],
-            maxTokens: 2000,
-          });
-
-          // Extract the text content from the response
-          const responseText = response.choices[0]?.message.content;
-          if (typeof responseText !== 'string') {
-            throw new Error("Invalid response format from AI");
-          }
-
-          // Parse the response with validation
-          let decomposition;
-          try {
-            const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-if (!jsonMatch) {
-  throw new Error("No JSON found in response");
-}
-decomposition = JSON.parse(jsonMatch[0]);
-          } catch (e) {
-            // Try to extract JSON from the response
-console.log("RAW AI RESPONSE:", responseText);
-            const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-              try {
-                decomposition = JSON.parse(jsonMatch[0]);
-              } catch (parseError) {
-                throw new Error("Failed to parse extracted JSON from AI response");
-              }
-            } else {
-              throw new Error("Failed to parse AI response - no JSON found");
-            }
-          }
-
-          // Validate decomposition structure
-          if (!decomposition.steps || !Array.isArray(decomposition.steps)) {
-            throw new Error("Invalid decomposition format: missing steps array");
-          }
-          if (decomposition.steps.length === 0) {
-            throw new Error("AI returned empty steps array");
-          }
-          if (!decomposition.totalEstimatedTime || typeof decomposition.totalEstimatedTime !== "number") {
-            throw new Error("Invalid decomposition format: missing totalEstimatedTime");
-          }
-          if (!decomposition.overallDifficulty) {
-            throw new Error("Invalid decomposition format: missing overallDifficulty");
-          }
-
-          // Create task in database
           if (!ctx.user) {
             throw new Error("User not authenticated");
           }
+
+          const decomposition = await decomposeTaskWithAI(input.taskDescription, input.context);
+
           let taskResult;
           try {
             taskResult = await db.createTask(
@@ -366,18 +373,16 @@ console.log("RAW AI RESPONSE:", responseText);
           }
 
           // Create micro-steps
-          if (decomposition.steps && Array.isArray(decomposition.steps)) {
-            await db.createMicroSteps(
-              taskId as number,
-              decomposition.steps.map((step: any, index: number) => ({
-                title: step.title,
-                description: step.description,
-                estimatedTime: step.estimatedTime,
-                difficulty: step.difficulty,
-                order: index + 1,
-              }))
-            );
-          }
+          await db.createMicroSteps(
+            taskId as number,
+            decomposition.steps.map((step: any, index: number) => ({
+              title: step.title,
+              description: step.description,
+              estimatedTime: step.estimatedTime,
+              difficulty: step.difficulty,
+              order: index + 1,
+            }))
+          );
 
           // Save to decomposition history
           await db.saveDecompositionHistory(ctx.user.id, input.taskDescription, decomposition);
@@ -388,6 +393,54 @@ console.log("RAW AI RESPONSE:", responseText);
           };
         } catch (error) {
           console.error("Error decomposing task:", error);
+          throw new Error("Failed to decompose task with AI");
+        }
+      }),
+
+    decomposeExisting: publicProcedure
+      .input(z.object({
+        taskId: z.number(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          if (!ctx.user) {
+            throw new Error("User not authenticated");
+          }
+
+          const userTasks = await db.getUserTasks(ctx.user.id);
+          const task = userTasks.find(t => t.id === input.taskId);
+          if (!task) {
+            throw new Error("Task not found");
+          }
+
+          const decomposition = await decomposeTaskWithAI(
+            task.title,
+            task.totalEstimatedTime ? `Tempo estimado: ${task.totalEstimatedTime} min` : ""
+          );
+
+          await db.createMicroSteps(
+            task.id,
+            decomposition.steps.map((step: any, index: number) => ({
+              title: step.title,
+              description: step.description,
+              estimatedTime: step.estimatedTime,
+              difficulty: step.difficulty,
+              order: index + 1,
+            }))
+          );
+
+          await db.updateTaskDetails(task.id, {
+            totalEstimatedTime: decomposition.totalEstimatedTime,
+          });
+
+          await db.saveDecompositionHistory(ctx.user.id, task.title, decomposition);
+
+          return {
+            taskId: task.id,
+            ...decomposition,
+          };
+        } catch (error) {
+          console.error("Error decomposing existing task:", error);
           throw new Error("Failed to decompose task with AI");
         }
       }),

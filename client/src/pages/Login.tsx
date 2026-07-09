@@ -43,17 +43,25 @@ export default function Login() {
 
   return (
     <div className="min-h-dvh flex items-center justify-center px-5 py-10 relative overflow-hidden" style={{ background: NAVY }}>
-      {/* Ondas decorativas de fundo — a verde é a onda laranja espelhada (rotação de 180°),
-          para as duas lerem como um par simétrico, não elementos soltos. */}
-      <svg className="absolute top-0 left-0 w-28 h-52 opacity-50 pointer-events-none" viewBox="0 0 100 200" fill="none">
-        <path d="M65 0 C30 35, 80 70, 40 105 C0 135, 45 170, 30 200" stroke={ORANGE} strokeWidth="1.4" fill="none" />
-        <path d="M14 22 l6 -6 M20 16 l6 6 M20 28 l-6 -6" stroke={ORANGE} strokeWidth="1.4" fill="none" strokeLinecap="round" />
+      {/* Ondas decorativas de fundo — linha fina abraçando a borda esquerda (laranja)
+          e a borda inferior direita (verde), conforme referência mais recente. */}
+      <svg
+        className="absolute left-0 pointer-events-none"
+        style={{ top: "13%", width: 130, height: "46%" }}
+        viewBox="0 0 130 380"
+        preserveAspectRatio="none"
+        fill="none"
+      >
+        <path d="M 0 0 C 130 80, 100 260, 0 380" stroke={ORANGE} strokeWidth="1.8" fill="none" strokeLinecap="round" />
       </svg>
-      <svg className="absolute bottom-0 right-0 w-28 h-52 opacity-50 pointer-events-none" viewBox="0 0 100 200" fill="none">
-        <g transform="rotate(180 50 100)">
-          <path d="M65 0 C30 35, 80 70, 40 105 C0 135, 45 170, 30 200" stroke={SAGE} strokeWidth="1.4" fill="none" />
-          <path d="M14 22 l6 -6 M20 16 l6 6 M20 28 l-6 -6" stroke={SAGE} strokeWidth="1.4" fill="none" strokeLinecap="round" />
-        </g>
+      <svg
+        className="absolute right-0 bottom-0 pointer-events-none"
+        style={{ width: 190, height: "18%" }}
+        viewBox="0 0 190 150"
+        preserveAspectRatio="none"
+        fill="none"
+      >
+        <path d="M 190 0 C 110 0, 30 40, 0 149" stroke={SAGE} strokeWidth="1.8" fill="none" strokeLinecap="round" />
       </svg>
 
       <div className="w-full max-w-sm relative z-10">

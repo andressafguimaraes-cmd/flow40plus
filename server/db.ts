@@ -178,6 +178,7 @@ export async function getTodayCheckIn(userId: number) {
     .select()
     .from(morningCheckIns)
     .where(and(eq(morningCheckIns.userId, userId), gte(morningCheckIns.createdAt, today)))
+    .orderBy(desc(morningCheckIns.createdAt))
     .limit(1);
 
   return checkIn.length > 0 ? checkIn[0] : null;

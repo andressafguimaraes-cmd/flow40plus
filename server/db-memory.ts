@@ -127,9 +127,10 @@ class InMemoryDatabase {
   getTodayCheckIn(userId: number) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    return Array.from(this.checkIns.values()).find(c => 
-      c.userId === userId && c.createdAt >= today
-    ) || null;
+    const todays = Array.from(this.checkIns.values())
+      .filter(c => c.userId === userId && c.createdAt >= today)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    return todays[0] ?? null;
   }
 
   getCheckInCount(userId: number) {

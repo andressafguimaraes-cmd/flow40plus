@@ -2,22 +2,19 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { useThemeColors } from "@/hooks/useThemeColors";
 
 // Paleta específica desta tela (mockup fornecido)
-const NAVY = "#16365A";
 const SAGE = "#5FA37A";
 const SAGE_DARK = "#3F8A63";
-const BG_APP = "#EEF3EC";
-const TEXT_MUTED = "#8C948C";
-const LINE = "#E7E5DE";
 const DONE_MUTED = "#A9AFA5";
 
 const PRIORITIES = [
-  { key: "urgente", label: "Urgente", tagBg: "#F6DEDE", tagText: "#C08787", accent: "#E8C1C1" },
-  { key: "alta", label: "Alta", tagBg: "#F8EEDA", tagText: "#BFA271", accent: "#EFD9AE" },
-  { key: "media", label: "Média", tagBg: "#E1EAF2", tagText: "#7C97B2", accent: "#C5D6E5" },
-  { key: "baixa", label: "Baixa", tagBg: "#E4EFE6", tagText: SAGE_DARK, accent: "#C3DCC7" },
-  { key: "sem", label: "Sem prioridade", tagBg: "#EBEBE6", tagText: "#9B9B93", accent: "#DCDCD5" },
+  { key: "urgente", label: "Urgente", tagBg: "#FBE1DE", tagText: "#C0392B", accent: "#E0685A" },
+  { key: "alta", label: "Alta", tagBg: "#FCEAD3", tagText: "#C97A1A", accent: "#EDA23F" },
+  { key: "media", label: "Média", tagBg: "#DCE9F6", tagText: "#2E6DA4", accent: "#6FA3D6" },
+  { key: "baixa", label: "Baixa", tagBg: "#DEEEE1", tagText: SAGE_DARK, accent: SAGE },
+  { key: "sem", label: "Sem prioridade", tagBg: "#EBEBE6", tagText: "#8E8E93", accent: "#C4C4C4" },
 ] as const;
 
 type PriorityKey = typeof PRIORITIES[number]["key"];
@@ -49,6 +46,7 @@ interface EditModalState {
 }
 
 export default function Tasks() {
+  const { NAVY, BG_APP, CARD, TEXT_MUTED, LINE } = useThemeColors();
   const [taskInput, setTaskInput] = useState("");
   const [timeInput, setTimeInput] = useState("60");
   const [priority, setPriority] = useState<PriorityKey>("sem");
@@ -75,8 +73,16 @@ export default function Tasks() {
     onError: () => { toast.error("Erro ao adicionar tarefa."); setSubmitting(false); },
   });
   const decomposeMutation = trpc.tasks.decompose.useMutation({
-    onSuccess: () => { toast.success("Tarefa decomposta com IA! ✨"); refetch(); resetCapture(); },
-    onError: () => { toast.error("Erro ao decompor. Tente novamente."); setSubmitting(false); },
+    onSuccess: () => { toast.success("Tarefa dividida em microtarefas! ✨"); refetch(); resetCapture(); },
+    onError: () => { toast.error("Erro ao dividir em microtarefas. Tente novamente."); setSubmitting(false); },
+  });
+  const decomposeExistingMutation = trpc.tasks.decomposeExisting.useMutation({
+    onSuccess: () => { toast.success("Tarefa dividida em microtarefas! ✨"); refetch(); },
+    onError: () => toast.error("Erro ao dividir em microtarefas. Tente novamente."),
+  });
+  const deleteTask = trpc.tasks.deleteTask.useMutation({
+    onSuccess: () => { toast.success("Tarefa excluída."); refetch(); },
+    onError: () => toast.error("Erro ao excluir tarefa."),
   });
   const updateStatus = trpc.tasks.updateTaskStatus.useMutation({ onSuccess: () => refetch() });
   const updateStep = trpc.tasks.updateMicroStepStatus.useMutation({ onSuccess: () => refetch() });
@@ -157,8 +163,8 @@ export default function Tasks() {
     return (
       <div
         key={task.id}
-        className="relative bg-white rounded-2xl pl-[18px] pr-10 py-3.5 flex gap-3 items-start transition-opacity"
-        style={{ boxShadow: "0 2px 10px rgba(22,54,90,0.05)", opacity: done ? 0.5 : 1 }}
+        className="relative rounded-2xl pl-[18px] pr-10 py-3.5 flex gap-3 items-start transition-opacity"
+        style={{ background: CARD, boxShadow: "0 2px 10px rgba(22,54,90,0.05)", opacity: done ? 0.5 : 1 }}
       >
         <span className="absolute left-0 top-3.5 bottom-3.5 w-[3px] rounded-[3px]" style={{ background: p.accent }} />
         <button
@@ -223,8 +229,8 @@ export default function Tasks() {
         </button>
         {isMenuOpen && (
           <div
-            className="absolute rounded-2xl p-1.5 flex flex-col gap-0.5 z-10 bg-white"
-            style={{ top: 36, right: 10, width: 170, boxShadow: "0 8px 24px rgba(22,54,90,0.18)" }}
+            className="absolute rounded-2xl p-1.5 flex flex-col gap-0.5 z-10"
+            style={{ top: 36, right: 10, width: 170, background: CARD, boxShadow: "0 8px 24px rgba(22,54,90,0.18)" }}
           >
             <button
               onClick={e => { e.stopPropagation(); openEditModal(task); }}
@@ -233,6 +239,16 @@ export default function Tasks() {
             >
               ✏️ Editar tarefa
             </button>
+            {!hasSteps && (
+              <button
+                onClick={e => { e.stopPropagation(); decomposeExistingMutation.mutate({ taskId: task.id }); setMenuOpenId(null); }}
+                disabled={decomposeExistingMutation.isPending}
+                className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-left text-[12.5px] font-medium disabled:opacity-50"
+                style={{ color: NAVY }}
+              >
+                ✨ Dividir em microtarefas
+              </button>
+            )}
             <div style={{ height: 1, background: LINE, margin: "2px 4px" }} />
             {PRIORITIES.map(pr => (
               <button
@@ -245,6 +261,20 @@ export default function Tasks() {
                 {pr.label}
               </button>
             ))}
+            <div style={{ height: 1, background: LINE, margin: "2px 4px" }} />
+            <button
+              onClick={e => {
+                e.stopPropagation();
+                setMenuOpenId(null);
+                if (window.confirm("Excluir esta tarefa? Essa ação não pode ser desfeita.")) {
+                  deleteTask.mutate({ taskId: task.id });
+                }
+              }}
+              className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-left text-[12.5px] font-medium"
+              style={{ color: "#B85C5C" }}
+            >
+              🗑️ Excluir tarefa
+            </button>
           </div>
         )}
       </div>
@@ -299,10 +329,10 @@ export default function Tasks() {
             onClick={() => setAiActive(v => !v)}
             className="flex items-center gap-2 rounded-[14px] px-3.5 text-[12.5px]"
             style={aiActive
-              ? { height: 44, color: SAGE_DARK, border: `1px solid ${SAGE}`, background: "#E4EFE6", fontWeight: 600 }
-              : { height: 44, color: TEXT_MUTED, border: `1px solid ${LINE}`, background: BG_APP, fontWeight: 500 }}
+              ? { height: 44, color: TEXT_MUTED, border: `1px solid ${LINE}`, background: BG_APP, fontWeight: 500 }
+              : { height: 44, color: SAGE_DARK, border: `1px solid ${SAGE}`, background: "#E4EFE6", fontWeight: 600 }}
           >
-            <span style={{ color: SAGE_DARK, fontSize: 14 }}>✨</span> Decompor com Inteligência Artificial
+            <span style={{ color: aiActive ? TEXT_MUTED : SAGE_DARK, fontSize: 14 }}>✨</span> Dividir em microtarefas com IA
           </button>
 
           <button
@@ -358,7 +388,7 @@ export default function Tasks() {
           style={{ background: "rgba(22,54,90,0.4)" }}
           onClick={e => { e.stopPropagation(); setEditModalTask(null); }}
         >
-          <div className="w-full max-w-md bg-white rounded-t-3xl p-5" onClick={e => e.stopPropagation()}>
+          <div className="w-full max-w-md rounded-t-3xl p-5" style={{ background: CARD }} onClick={e => e.stopPropagation()}>
             <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: LINE }} />
             <h3 className="text-base font-bold mb-4" style={{ color: NAVY }}>Editar tarefa</h3>
 

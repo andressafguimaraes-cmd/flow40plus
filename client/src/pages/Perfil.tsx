@@ -15,20 +15,22 @@ const NAVY_FILL = "#16365A"; // fundo do botão de editar avatar — constante n
 
 const MONTH_NAMES_CAP = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
-function vaultDateLabel(daysAgo: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - daysAgo);
-  const label = `${d.getDate()} de ${MONTH_NAMES_CAP[d.getMonth()]} de ${d.getFullYear()}`;
-  if (daysAgo === 0) return `Hoje, ${label}`;
-  if (daysAgo === 1) return `Ontem, ${label}`;
-  return label;
+function dateKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
-const GRATITUDE_VAULT = [
-  { daysAgo: 0, text: "Grata pelo café quentinho e pelo abraço apertado do meu filho antes de sair de casa." },
-  { daysAgo: 1, text: "Pela paciência e calma que encontrei para resolver aquele problema complexo com o cliente." },
-  { daysAgo: 2, text: "Por conseguir tirar 15 minutos de silêncio para respirar no meio de uma tarde super corrida." },
-];
+function vaultDateLabel(date: Date): string {
+  const today = new Date();
+  const label = `${date.getDate()} de ${MONTH_NAMES_CAP[date.getMonth()]} de ${date.getFullYear()}`;
+  if (dateKey(date) === dateKey(today)) return `Hoje, ${label}`;
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (dateKey(date) === dateKey(yesterday)) return `Ontem, ${label}`;
+  return label;
+}
 
 export default function Perfil() {
   const [, setLocation] = useLocation();
@@ -44,6 +46,7 @@ export default function Perfil() {
   const AVATAR_BG = isDark ? "#22352C" : "#D5DFD8";
   const { data: checkInTotal } = trpc.checkIns.getTotalCount.useQuery();
   const { data: userTasks } = trpc.tasks.list.useQuery();
+  const { data: checkInHistory } = trpc.checkIns.getHistory.useQuery();
 
   const [photo, setPhoto] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -59,11 +62,16 @@ export default function Perfil() {
     if (user) {
       setName(user.name ?? "");
       setEmail(user.email ?? "");
+      setPhoto(localStorage.getItem(`flow40_profile_photo_${user.id}`));
     }
   }, [user]);
 
   const completedTasksCount = userTasks?.filter(t => t.status === "completed").length;
   const plannedTasksCount = userTasks?.length;
+
+  const gratitudeEntries = (checkInHistory ?? [])
+    .filter(h => h.notes && h.notes.trim().length > 0)
+    .map(h => ({ date: new Date(h.createdAt), text: h.notes as string }));
 
   const STATS = [
     { label: "Check-ups", value: checkInTotal !== undefined ? String(checkInTotal.count) : "—", icon: "☀️" },
@@ -73,9 +81,13 @@ export default function Perfil() {
 
   const handlePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !user) return;
     const reader = new FileReader();
-    reader.onload = ev => setPhoto(ev.target?.result as string);
+    reader.onload = ev => {
+      const dataUrl = ev.target?.result as string;
+      setPhoto(dataUrl);
+      localStorage.setItem(`flow40_profile_photo_${user.id}`, dataUrl);
+    };
     reader.readAsDataURL(file);
   };
 
@@ -211,12 +223,18 @@ export default function Perfil() {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto flex flex-col gap-3 pb-2">
-              {GRATITUDE_VAULT.map((entry, i) => (
-                <div key={i} className="rounded-2xl p-3.5" style={{ background: CARD, boxShadow: "0 2px 6px rgba(22,54,90,0.02)" }}>
-                  <p className="text-[11px] font-semibold mb-1.5" style={{ color: TEXT_MUTED }}>{vaultDateLabel(entry.daysAgo)}</p>
-                  <p className="text-[13px] italic leading-relaxed" style={{ color: NAVY }}>"{entry.text}"</p>
-                </div>
-              ))}
+              {gratitudeEntries.length === 0 ? (
+                <p className="text-center text-[12.5px] font-medium py-6" style={{ color: TEXT_MUTED }}>
+                  Ainda não há gratidões registradas. Escreva algo no campo "Pelo que você é grata hoje?" do seu próximo check-up. 🌿
+                </p>
+              ) : (
+                gratitudeEntries.map((entry, i) => (
+                  <div key={i} className="rounded-2xl p-3.5" style={{ background: CARD, boxShadow: "0 2px 6px rgba(22,54,90,0.02)" }}>
+                    <p className="text-[11px] font-semibold mb-1.5" style={{ color: TEXT_MUTED }}>{vaultDateLabel(entry.date)}</p>
+                    <p className="text-[13px] italic leading-relaxed" style={{ color: NAVY }}>"{entry.text}"</p>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>,

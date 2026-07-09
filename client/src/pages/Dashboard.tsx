@@ -5,17 +5,15 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import Logo from "@/components/Logo";
 import { useSuggestedPractice } from "@/hooks/useSuggestedPractice";
+import { useThemeColors } from "@/hooks/useThemeColors";
 
 // Paleta específica desta tela (mockup fornecido)
-const NAVY = "#16365A";
 const SAGE = "#5FA37A";
 const SAGE_DARK = "#3F8A63";
 const BLUE_SOFT = "#5C8FC7";
-const BG_APP = "#EEF3EC";
 const CREAM = "#FBF0D6";
 const SAGE_LIGHT = "#DCEEE0";
 const PINK = "#FBE3E3";
-const LINE = "#E4E2DC";
 
 const INSIGHTS = [
   "Energia não é fazer mais. É focar no que importa com presença.",
@@ -95,6 +93,7 @@ interface DashboardProps {
 
 export default function Dashboard({ onOpenCheckIn }: DashboardProps) {
   const [, setLocation] = useLocation();
+  const { NAVY, BG_APP, CARD, TEXT_MUTED, LINE } = useThemeColors();
   const { user } = useAuth();
   const { data: todayCheckIn } = trpc.checkIns.getTodayCheckIn.useQuery();
   const { data: weeklyStats } = trpc.checkIns.getWeeklyStats.useQuery();
@@ -212,8 +211,8 @@ export default function Dashboard({ onOpenCheckIn }: DashboardProps) {
       <div className="relative flex flex-col items-center pt-5 pb-1 px-5">
         <button
           onClick={() => setLocation("/planejamento")}
-          className="absolute right-5 top-5 w-[34px] h-[34px] rounded-[10px] bg-white flex items-center justify-center text-base"
-          style={{ color: NAVY, boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}
+          className="absolute right-5 top-5 w-[34px] h-[34px] rounded-[10px] flex items-center justify-center text-base"
+          style={{ color: NAVY, background: CARD, boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}
           aria-label="Ir para Planejamento"
         >
           📅
@@ -303,8 +302,8 @@ export default function Dashboard({ onOpenCheckIn }: DashboardProps) {
             </div>
           </div>
         ) : (
-          <div className="mb-5 rounded-2xl p-4 text-center bg-white">
-            <p className="text-sm mb-2" style={{ color: "#8A8A82" }}>Faça o check-up matinal para ver seu estado hoje</p>
+          <div className="mb-5 rounded-2xl p-4 text-center" style={{ background: CARD }}>
+            <p className="text-sm mb-2" style={{ color: TEXT_MUTED }}>Faça o check-up matinal para ver seu estado hoje</p>
             <button className="text-xs font-bold" style={{ color: SAGE_DARK }} onClick={handleOpenCheckIn}>
               Fazer check-up agora →
             </button>
@@ -312,13 +311,13 @@ export default function Dashboard({ onOpenCheckIn }: DashboardProps) {
         )}
 
         {/* Insight do dia */}
-        <div className="flex items-start gap-3 rounded-[18px] p-4 mb-4 bg-white" style={{ boxShadow: "0 1px 4px rgba(0,0,0,0.03)" }}>
+        <div className="flex items-start gap-3 rounded-[18px] p-4 mb-4" style={{ background: CARD, boxShadow: "0 1px 4px rgba(0,0,0,0.03)" }}>
           <div className="w-[34px] h-[34px] rounded-full flex items-center justify-center text-[15px] flex-shrink-0" style={{ background: SAGE_LIGHT, color: SAGE_DARK }}>
             💡
           </div>
           <div>
             <p className="font-semibold text-[14.5px] mb-1" style={{ color: NAVY }}>Insight de hoje</p>
-            <p className="text-[13px] leading-relaxed" style={{ color: "#8C948C" }}>{insight}</p>
+            <p className="text-[13px] leading-relaxed" style={{ color: TEXT_MUTED }}>{insight}</p>
           </div>
         </div>
 

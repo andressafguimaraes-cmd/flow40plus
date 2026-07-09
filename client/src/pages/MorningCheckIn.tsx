@@ -2,13 +2,12 @@ import { useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { useThemeColors } from "@/hooks/useThemeColors";
 
 // Paleta específica deste modal (mockup fornecido), com uma cor distinta por métrica.
-const NAVY = "#16365A";
 const ORANGE = "#F2994A";
 const BLUE = "#3A7BD5";
 const GREEN = "#3FA66A";
-const TEXT_MUTED = "#8C8C86";
 
 interface MetricSliderProps {
   label: string;
@@ -22,6 +21,7 @@ interface MetricSliderProps {
 }
 
 function MetricSlider({ label, icon, color, value, onChange, badges, minLabel, maxLabel }: MetricSliderProps) {
+  const { NAVY, TEXT_MUTED } = useThemeColors();
   const trackRef = useRef<HTMLDivElement>(null);
   const pct = ((value - 1) / 4) * 100;
 
@@ -93,6 +93,7 @@ interface MorningCheckInProps {
 
 export default function MorningCheckIn({ onClose, onComplete }: MorningCheckInProps) {
   const [, setLocation] = useLocation();
+  const { NAVY, CARD, TEXT_MUTED } = useThemeColors();
   const utils = trpc.useUtils();
   const [sleep, setSleep] = useState(3);
   const [energy, setEnergy] = useState(3);
@@ -102,6 +103,7 @@ export default function MorningCheckIn({ onClose, onComplete }: MorningCheckInPr
   const [showTimeEdit, setShowTimeEdit] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [justCompleted, setJustCompleted] = useState(false);
+  const [listeningGratitude, setListeningGratitude] = useState(false);
 
   const createCheckIn = trpc.checkIns.create.useMutation({
     onSuccess: () => {
@@ -125,10 +127,29 @@ export default function MorningCheckIn({ onClose, onComplete }: MorningCheckInPr
     createCheckIn.mutate({ sleepQuality: sleep, energyLevel: energy, mentalClarity: clarity, notes: notes || undefined });
   };
 
+  const handleVoiceGratitude = () => {
+    if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
+      toast.error("Reconhecimento de voz não suportado neste navegador.");
+      return;
+    }
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const recognition = new SR();
+    recognition.lang = "pt-BR";
+    recognition.interimResults = false;
+    setListeningGratitude(true);
+    recognition.onresult = (e: any) => {
+      const text = e.results[0][0].transcript;
+      setNotes(prev => (prev.trim() ? `${prev.trim()} ${text}` : text));
+    };
+    recognition.onerror = () => toast.error("Erro no reconhecimento de voz.");
+    recognition.onend = () => setListeningGratitude(false);
+    recognition.start();
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm">
-      <div className="w-full max-w-md bg-white rounded-t-[28px] overflow-hidden"
-           style={{ maxHeight: "92vh", display: "flex", flexDirection: "column" }}>
+      <div className="w-full max-w-md rounded-t-[28px] overflow-hidden"
+           style={{ background: CARD, maxHeight: "92vh", display: "flex", flexDirection: "column" }}>
 
         {/* Handle */}
         <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
@@ -144,8 +165,8 @@ export default function MorningCheckIn({ onClose, onComplete }: MorningCheckInPr
                 <div className="flex items-center gap-1">
                   <input type="time" value={alertTime}
                     onChange={e => setAlertTime(e.target.value)}
-                    className="text-xs border border-border rounded-lg px-2 py-1 bg-white outline-none"
-                    style={{ borderColor: "var(--color-border)" }}
+                    className="text-xs border border-border rounded-lg px-2 py-1 outline-none"
+                    style={{ borderColor: "var(--color-border)", background: CARD, color: NAVY }}
                   />
                   <button onClick={() => setShowTimeEdit(false)}
                     className="text-xs font-bold" style={{ color: NAVY }}>OK</button>
@@ -188,19 +209,30 @@ export default function MorningCheckIn({ onClose, onComplete }: MorningCheckInPr
             <p className="font-semibold text-[15px] mb-1" style={{ color: NAVY }}>
               Pelo que você é grata hoje? <span className="font-medium text-[13px]" style={{ color: TEXT_MUTED }}>(opcional)</span>
             </p>
-            <textarea
-              value={notes}
-              onChange={e => setNotes(e.target.value)}
-              placeholder="Ex: Pela saúde, pela família, pelo café quentinho..."
-              rows={3}
-              className="w-full text-sm rounded-[18px] border border-border p-3.5 resize-none outline-none placeholder:text-muted"
-              style={{ color: NAVY, background: "#FDFDFC" }}
-            />
+            <div className="relative">
+              <textarea
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                placeholder="Ex: Pela saúde, pela família, pelo café quentinho..."
+                rows={3}
+                className="w-full text-sm rounded-[18px] border border-border p-3.5 pr-11 resize-none outline-none placeholder:text-muted"
+                style={{ color: NAVY, background: CARD }}
+              />
+              <button
+                type="button"
+                onClick={handleVoiceGratitude}
+                className="absolute right-3 top-3 text-[15px]"
+                style={{ color: listeningGratitude ? "#C06060" : TEXT_MUTED }}
+                aria-label="Ditar gratidão por voz"
+              >
+                {listeningGratitude ? "🛑" : "🎙️"}
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Footer CTA */}
-        <div className="px-6 pb-8 pt-4 flex-shrink-0 bg-white">
+        <div className="px-6 pb-8 pt-4 flex-shrink-0" style={{ background: CARD }}>
           <button
             onClick={handleSubmit}
             disabled={submitting || createCheckIn.isPending || justCompleted}
