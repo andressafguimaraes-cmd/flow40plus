@@ -223,6 +223,13 @@ export default function Planejamento() {
                 <span className="text-[11px] font-medium flex-shrink-0" style={{ color: TEXT_MUTED }}>{formatMinutes(task.totalEstimatedTime)}</span>
               )}
               <button
+                onClick={() => setDayPickerTaskId(task.id)}
+                className="text-[10px] font-semibold underline flex-shrink-0"
+                style={{ color: SAGE_DARK }}
+              >
+                mudar data
+              </button>
+              <button
                 onClick={() => setScheduledTime.mutate({ taskId: task.id, scheduledTime: null })}
                 className="text-[10px] font-semibold underline flex-shrink-0"
                 style={{ color: TEXT_MUTED }}
@@ -268,7 +275,10 @@ export default function Planejamento() {
                     </span>
                     <span style={{ color: "#D4D4CC" }}>•</span>
                     {task.totalEstimatedTime != null && <span>⏱ {formatMinutes(task.totalEstimatedTime)}</span>}
-                    <button onClick={() => openTimeModal(task.id, task.scheduledTime)} className="ml-auto text-[10.5px] font-semibold" style={{ color: SAGE_DARK }}>
+                    <button onClick={() => setDayPickerTaskId(task.id)} className="ml-auto text-[10.5px] font-semibold" style={{ color: SAGE_DARK }}>
+                      📅 data
+                    </button>
+                    <button onClick={() => openTimeModal(task.id, task.scheduledTime)} className="text-[10.5px] font-semibold" style={{ color: SAGE_DARK }}>
                       🕐 âncora
                     </button>
                   </div>
