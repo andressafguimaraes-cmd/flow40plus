@@ -259,6 +259,34 @@ class InMemoryDatabase {
     }
   }
 
+  addMicroStep(taskId: number, title: string, estimatedTime: number = 10) {
+    const id = this.microStepIdCounter++;
+    const existing = Array.from(this.microSteps.values()).filter(m => m.taskId === taskId);
+    const nextOrder = existing.length > 0 ? Math.max(...existing.map(s => s.order)) + 1 : 1;
+    const microStep: StoredMicroStep = {
+      id,
+      taskId,
+      title,
+      estimatedTime,
+      completed: false,
+      order: nextOrder,
+      createdAt: new Date(),
+    };
+    this.microSteps.set(id, microStep);
+    return { insertId: id };
+  }
+
+  updateMicroStepDetails(microStepId: number, updates: { title?: string; estimatedTime?: number }) {
+    const step = this.microSteps.get(microStepId);
+    if (step) {
+      Object.assign(step, updates);
+    }
+  }
+
+  deleteMicroStep(microStepId: number) {
+    this.microSteps.delete(microStepId);
+  }
+
   // Practices
   getAllPractices() {
     return Array.from(this.practices.values());

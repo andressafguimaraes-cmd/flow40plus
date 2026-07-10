@@ -478,6 +478,35 @@ export const appRouter = router({
         return { success: true };
       }),
 
+    addMicroStep: publicProcedure
+      .input(z.object({
+        taskId: z.number(),
+        title: z.string().trim().min(1).max(300),
+      }))
+      .mutation(async ({ input }) => {
+        const result = await db.addMicroStep(input.taskId, input.title);
+        return { success: true, microStepId: result.insertId };
+      }),
+
+    updateMicroStep: publicProcedure
+      .input(z.object({
+        microStepId: z.number(),
+        title: z.string().trim().min(1).max(300),
+      }))
+      .mutation(async ({ input }) => {
+        await db.updateMicroStepDetails(input.microStepId, { title: input.title });
+        return { success: true };
+      }),
+
+    deleteMicroStep: publicProcedure
+      .input(z.object({
+        microStepId: z.number(),
+      }))
+      .mutation(async ({ input }) => {
+        await db.deleteMicroStep(input.microStepId);
+        return { success: true };
+      }),
+
     updateTaskStatus: publicProcedure
       .input(z.object({
         taskId: z.number(),

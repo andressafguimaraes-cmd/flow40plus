@@ -17,6 +17,17 @@ interface SwipeableTabsProps {
 export default function SwipeableTabs({ location, onNavigate, onOpenCheckIn }: SwipeableTabsProps) {
   const [emblaRef, emblaApi] = useEmblaCarousel({ align: "start", loop: false });
 
+  // No primeiro paint, o Embla às vezes mede o container com largura 0/errada
+  // (ainda em layout) e trava todos os snap points nessa medida — depois
+  // disso, scrollTo() não navega para lugar nenhum e o menu inferior parece
+  // travado. Forçar um reInit() no próximo frame garante que ele recalcule
+  // contra o layout já assentado, antes de qualquer clique do usuário.
+  useEffect(() => {
+    if (!emblaApi) return;
+    const raf = requestAnimationFrame(() => emblaApi.reInit());
+    return () => cancelAnimationFrame(raf);
+  }, [emblaApi]);
+
   // Arrastar (swipe) -> atualiza a URL
   useEffect(() => {
     if (!emblaApi) return;

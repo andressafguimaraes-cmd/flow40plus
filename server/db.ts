@@ -370,6 +370,54 @@ export async function getTaskMicroSteps(taskId: number) {
   return steps;
 }
 
+export async function addMicroStep(taskId: number, title: string, estimatedTime: number = 10) {
+  const db = await getDb();
+  if (!db) {
+    if (useMemoryFallback) {
+      return memoryDb.addMicroStep(taskId, title, estimatedTime);
+    }
+    throw new Error("Database not available");
+  }
+
+  const existing = await db.select({ order: microSteps.order }).from(microSteps).where(eq(microSteps.taskId, taskId));
+  const nextOrder = existing.length > 0 ? Math.max(...existing.map(s => s.order)) + 1 : 1;
+
+  const result = await db.insert(microSteps).values({
+    taskId,
+    title,
+    estimatedTime,
+    order: nextOrder,
+  }).returning({ id: microSteps.id });
+
+  return { insertId: result[0]?.id ?? 0 };
+}
+
+export async function updateMicroStepDetails(microStepId: number, updates: { title?: string; estimatedTime?: number }) {
+  const db = await getDb();
+  if (!db) {
+    if (useMemoryFallback) {
+      memoryDb.updateMicroStepDetails(microStepId, updates);
+      return;
+    }
+    throw new Error("Database not available");
+  }
+
+  await db.update(microSteps).set(updates).where(eq(microSteps.id, microStepId));
+}
+
+export async function deleteMicroStep(microStepId: number) {
+  const db = await getDb();
+  if (!db) {
+    if (useMemoryFallback) {
+      memoryDb.deleteMicroStep(microStepId);
+      return;
+    }
+    throw new Error("Database not available");
+  }
+
+  await db.delete(microSteps).where(eq(microSteps.id, microStepId));
+}
+
 export async function updateMicroStepStatus(microStepId: number, completed: boolean) {
   const db = await getDb();
   if (!db) {

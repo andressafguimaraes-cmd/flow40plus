@@ -57,6 +57,8 @@ export default function Tasks() {
   const [expandedTasks, setExpandedTasks] = useState<Record<number, boolean>>({});
   const [editModalTask, setEditModalTask] = useState<EditModalState | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
+  const [newStepInputs, setNewStepInputs] = useState<Record<number, string>>({});
+  const [editingStep, setEditingStep] = useState<{ id: number; title: string } | null>(null);
 
   const { data: tasks, refetch } = trpc.tasks.list.useQuery();
 
@@ -86,6 +88,9 @@ export default function Tasks() {
   });
   const updateStatus = trpc.tasks.updateTaskStatus.useMutation({ onSuccess: () => refetch() });
   const updateStep = trpc.tasks.updateMicroStepStatus.useMutation({ onSuccess: () => refetch() });
+  const addMicroStep = trpc.tasks.addMicroStep.useMutation({ onSuccess: () => refetch() });
+  const updateMicroStep = trpc.tasks.updateMicroStep.useMutation({ onSuccess: () => refetch() });
+  const deleteMicroStep = trpc.tasks.deleteMicroStep.useMutation({ onSuccess: () => refetch() });
   const updatePriority = trpc.tasks.updatePriority.useMutation({ onSuccess: () => refetch() });
   const updateTask = trpc.tasks.update.useMutation({
     onSuccess: () => { toast.success("Tarefa atualizada!"); refetch(); setEditModalTask(null); },
@@ -100,6 +105,20 @@ export default function Tasks() {
       priority: (task.priority ?? "sem") as PriorityKey,
     });
     setMenuOpenId(null);
+  };
+
+  const handleAddStep = (taskId: number) => {
+    const title = (newStepInputs[taskId] ?? "").trim();
+    if (!title) return;
+    addMicroStep.mutate({ taskId, title });
+    setNewStepInputs(prev => ({ ...prev, [taskId]: "" }));
+  };
+
+  const saveStepEdit = () => {
+    if (!editingStep) return;
+    const title = editingStep.title.trim();
+    if (title) updateMicroStep.mutate({ microStepId: editingStep.id, title });
+    setEditingStep(null);
   };
 
   const handleAdd = () => {
@@ -187,35 +206,71 @@ export default function Tasks() {
             <span className="px-2 py-0.5 rounded-[6px] text-[10.5px] font-semibold" style={{ background: p.tagBg, color: p.tagText }}>{p.label}</span>
             <span style={{ color: "#D4D4CC" }}>•</span>
             <span>⏱ {task.totalEstimatedTime ? `${task.totalEstimatedTime}min` : "—"}</span>
-            {hasSteps && (
-              <>
-                <span style={{ color: "#D4D4CC" }}>•</span>
-                <button onClick={() => setExpandedTasks(prev => ({ ...prev, [task.id]: !prev[task.id] }))} className="underline" style={{ color: TEXT_MUTED }}>
-                  {task.steps.length} micro-passo{task.steps.length !== 1 ? "s" : ""}
-                </button>
-              </>
-            )}
+            <span style={{ color: "#D4D4CC" }}>•</span>
+            <button onClick={() => setExpandedTasks(prev => ({ ...prev, [task.id]: !prev[task.id] }))} className="underline" style={{ color: TEXT_MUTED }}>
+              {hasSteps ? `${task.steps.length} micro-passo${task.steps.length !== 1 ? "s" : ""}` : "micro-passos"}
+            </button>
           </div>
 
           <div className="h-[3px] rounded-full overflow-hidden" style={{ background: "#EDECE6" }}>
             <div className="h-full rounded-full transition-all" style={{ width: `${done ? 100 : task.progress}%`, background: SAGE }} />
           </div>
 
-          {isExpanded && hasSteps && (
+          {isExpanded && (
             <div className="flex flex-col gap-1.5 mt-3">
               {task.steps.map(step => (
                 <div key={step.id} className="flex items-center gap-2">
                   <input
                     type="checkbox" checked={step.completed ?? false}
                     onChange={e => updateStep.mutate({ microStepId: step.id, completed: e.target.checked })}
-                    className="w-3.5 h-3.5 rounded" style={{ accentColor: SAGE }}
+                    className="w-3.5 h-3.5 rounded flex-shrink-0" style={{ accentColor: SAGE }}
                   />
-                  <span className="text-xs" style={{ color: step.completed ? TEXT_MUTED : NAVY, textDecoration: step.completed ? "line-through" : "none" }}>
-                    {step.title}
-                  </span>
-                  {step.estimatedTime && <span className="text-[9px]" style={{ color: TEXT_MUTED }}>~{step.estimatedTime}min</span>}
+                  {editingStep?.id === step.id ? (
+                    <input
+                      autoFocus
+                      value={editingStep.title}
+                      onChange={e => setEditingStep({ id: step.id, title: e.target.value })}
+                      onBlur={saveStepEdit}
+                      onKeyDown={e => {
+                        if (e.key === "Enter") saveStepEdit();
+                        if (e.key === "Escape") setEditingStep(null);
+                      }}
+                      className="flex-1 min-w-0 text-xs bg-transparent outline-none border-b"
+                      style={{ color: NAVY, borderColor: SAGE }}
+                    />
+                  ) : (
+                    <button
+                      onClick={() => setEditingStep({ id: step.id, title: step.title })}
+                      className="flex-1 min-w-0 text-left text-xs truncate"
+                      style={{ color: step.completed ? TEXT_MUTED : NAVY, textDecoration: step.completed ? "line-through" : "none" }}
+                    >
+                      {step.title}
+                    </button>
+                  )}
+                  {step.estimatedTime != null && <span className="text-[9px] flex-shrink-0" style={{ color: TEXT_MUTED }}>~{step.estimatedTime}min</span>}
+                  <button
+                    onClick={() => deleteMicroStep.mutate({ microStepId: step.id })}
+                    className="text-xs flex-shrink-0"
+                    style={{ color: "#C0392B" }}
+                    aria-label="Excluir micro-passo"
+                  >
+                    ×
+                  </button>
                 </div>
               ))}
+              <div className="flex items-center gap-2 mt-0.5">
+                <input
+                  value={newStepInputs[task.id] ?? ""}
+                  onChange={e => setNewStepInputs(prev => ({ ...prev, [task.id]: e.target.value }))}
+                  onKeyDown={e => { if (e.key === "Enter") handleAddStep(task.id); }}
+                  placeholder="Novo micro-passo..."
+                  className="flex-1 min-w-0 text-xs bg-transparent outline-none border-b py-0.5"
+                  style={{ color: NAVY, borderColor: LINE }}
+                />
+                <button onClick={() => handleAddStep(task.id)} className="text-[11px] font-semibold flex-shrink-0" style={{ color: SAGE_DARK }}>
+                  + Adicionar
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -319,7 +374,7 @@ export default function Tasks() {
                 style={{ color: NAVY }}
               >
                 {PRIORITIES.map(p => (
-                  <option key={p.key} value={p.key}>🏳️ {p.label}</option>
+                  <option key={p.key} value={p.key} style={{ color: p.accent }}>● {p.label}</option>
                 ))}
               </select>
             </div>
