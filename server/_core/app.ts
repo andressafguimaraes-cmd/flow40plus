@@ -31,6 +31,16 @@ export function createApp(): Express {
     createExpressMiddleware({
       router: appRouter,
       createContext,
+      onError({ error, path }) {
+        // The client only ever sees a sanitized message (see errorFormatter
+        // in trpc.ts) — log the real error and its root cause (e.g. the
+        // underlying pg connection error behind a Drizzle "Failed query")
+        // here so it's visible in server/Vercel runtime logs.
+        console.error(`[tRPC] ${path ?? "<unknown>"} failed:`, error);
+        if (error.cause) {
+          console.error(`[tRPC] ${path ?? "<unknown>"} cause:`, error.cause);
+        }
+      },
     })
   );
 
