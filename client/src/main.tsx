@@ -81,3 +81,13 @@ createRoot(document.getElementById("root")!).render(
     </QueryClientProvider>
   </trpc.Provider>
 );
+
+// Só registra em produção: em dev o SW cachearia os módulos do Vite e
+// atrapalharia o HMR.
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(err => {
+      console.warn("[SW] registration failed:", err);
+    });
+  });
+}
