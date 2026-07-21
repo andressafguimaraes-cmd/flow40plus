@@ -6,7 +6,8 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/contexts/ThemeContext";
 import { trpc } from "@/lib/trpc";
-import { REMINDERS, getReminderSettings, saveReminderSettings } from "@/lib/reminderSettings";
+import { TIMED_REMINDERS, defaultNotificationSettings, type NotificationSettings } from "@shared/notificationSettings";
+import { isPushSupported, requestPushSubscription, getExistingPushSubscription, removePushSubscription } from "@/lib/pushNotifications";
 
 // Paleta específica desta tela (mockup fornecido)
 const SAGE = "#5FA37A";
@@ -14,6 +15,10 @@ const ORANGE = "#E8813A";
 const NAVY_FILL = "#16365A"; // fundo do botão de editar avatar — constante nos dois temas
 
 const MONTH_NAMES_CAP = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+
+const CHECKIN_REMINDER = TIMED_REMINDERS.find(r => r.id === "checkin")!;
+const PAUSA_REMINDERS = TIMED_REMINDERS.filter(r => r.id.startsWith("pausa_"));
+const TASK_REMINDERS = TIMED_REMINDERS.filter(r => r.id === "task_summary" || r.id === "recalibrate");
 
 function dateKey(d: Date): string {
   const y = d.getFullYear();
@@ -47,6 +52,11 @@ export default function Perfil() {
   const { data: checkInTotal } = trpc.checkIns.getTotalCount.useQuery();
   const { data: userTasks } = trpc.tasks.list.useQuery();
   const { data: checkInHistory } = trpc.checkIns.getHistory.useQuery();
+  const { data: notificationSettings } = trpc.notifications.getSettings.useQuery();
+  const { data: vapidPublicKey } = trpc.notifications.getVapidPublicKey.useQuery();
+  const saveSettingsMutation = trpc.notifications.saveSettings.useMutation({ onSuccess: () => toast.success("Alertas salvos!") });
+  const subscribeMutation = trpc.notifications.subscribe.useMutation();
+  const unsubscribeMutation = trpc.notifications.unsubscribe.useMutation();
 
   const [photo, setPhoto] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -54,9 +64,42 @@ export default function Perfil() {
   const [editingProfile, setEditingProfile] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [isVaultOpen, setIsVaultOpen] = useState(false);
-  const [pauseAlerts, setPauseAlerts] = useState(getReminderSettings);
-  const [checkInAlert, setCheckInAlert] = useState({ enabled: true, time: "08:00" });
+  const [draft, setDraft] = useState<NotificationSettings>(defaultNotificationSettings());
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [enablingPush, setEnablingPush] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    getExistingPushSubscription().then(sub => setPushEnabled(!!sub));
+  }, []);
+
+  const handleEnablePush = async () => {
+    if (!vapidPublicKey) {
+      toast.error("Não foi possível carregar a configuração de notificações. Tente de novo em instantes.");
+      return;
+    }
+    setEnablingPush(true);
+    try {
+      const sub = await requestPushSubscription(vapidPublicKey);
+      await subscribeMutation.mutateAsync(sub);
+      setPushEnabled(true);
+      toast.success("Notificações ativadas neste dispositivo!");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível ativar as notificações.");
+    } finally {
+      setEnablingPush(false);
+    }
+  };
+
+  const handleDisablePush = async () => {
+    const endpoint = await removePushSubscription();
+    if (endpoint) await unsubscribeMutation.mutateAsync({ endpoint });
+    setPushEnabled(false);
+    toast.info("Notificações desativadas neste dispositivo.");
+  };
+
+  const updateReminder = (id: keyof NotificationSettings["reminders"], patch: Partial<{ enabled: boolean; time: string }>) =>
+    setDraft(prev => ({ ...prev, reminders: { ...prev.reminders, [id]: { ...prev.reminders[id], ...patch } } }));
 
   useEffect(() => {
     if (user) {
@@ -97,7 +140,15 @@ export default function Perfil() {
 
   const RHYTHM_SETTINGS = [
     { icon: "👤", label: "Editar perfil", detail: undefined as string | undefined, action: () => setEditingProfile(true) },
-    { icon: "🔔", label: "Lembrete do Check-up", detail: checkInAlert.time, action: () => setShowNotifications(true) },
+    {
+      icon: "🔔",
+      label: "Notificações e Lembretes",
+      detail: notificationSettings?.reminders.checkin.time,
+      action: () => {
+        setDraft(notificationSettings ?? defaultNotificationSettings());
+        setShowNotifications(true);
+      },
+    },
   ];
 
   const APP_SETTINGS = [
@@ -271,29 +322,90 @@ export default function Perfil() {
         document.body
       )}
 
-      {/* Modal: Lembrete do Check-up */}
+      {/* Modal: Notificações e Lembretes */}
       {showNotifications && createPortal(
         <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(22,54,90,0.4)" }}>
           <div className="w-full max-w-md rounded-t-3xl p-5 max-h-[80vh] overflow-y-auto" style={{ background: BG_APP }}>
             <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: LINE }} />
-            <h3 className="text-base font-bold mb-4" style={{ color: NAVY }}>Lembrete do Check-up</h3>
+            <h3 className="text-base font-bold mb-4" style={{ color: NAVY }}>Notificações e Lembretes</h3>
+
+            {/* Ativação de push */}
+            <div className="mb-4 rounded-2xl p-3" style={{ background: CARD }}>
+              {!isPushSupported() ? (
+                <p className="text-xs font-medium" style={{ color: TEXT_MUTED }}>
+                  Seu navegador não suporta notificações push.
+                </p>
+              ) : pushEnabled ? (
+                <div className="flex items-center justify-between">
+                  <span className="text-[13px] font-semibold" style={{ color: NAVY }}>✅ Notificações ativadas neste dispositivo</span>
+                  <button onClick={handleDisablePush} className="text-xs font-semibold underline flex-shrink-0" style={{ color: TEXT_MUTED }}>
+                    Desativar
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={handleEnablePush}
+                  disabled={enablingPush}
+                  className="w-full h-10 rounded-xl text-white text-sm font-bold disabled:opacity-50"
+                  style={{ background: SAGE }}
+                >
+                  {enablingPush ? "Ativando..." : "🔔 Ativar notificações"}
+                </button>
+              )}
+            </div>
 
             {/* Check-in matinal */}
             <div className="mb-4">
               <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: TEXT_MUTED }}>Check-up Matinal</p>
               <div className="rounded-2xl p-3" style={{ background: CARD }}>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-semibold" style={{ color: NAVY }}>☀️ Alerta matinal</span>
+                  <span className="text-sm font-semibold" style={{ color: NAVY }}>{CHECKIN_REMINDER.icon} Alerta matinal</span>
                   <div className="w-10 h-6 rounded-full cursor-pointer transition-all"
-                       style={{ background: checkInAlert.enabled ? SAGE : LINE }}
-                       onClick={() => setCheckInAlert(a => ({ ...a, enabled: !a.enabled }))}>
-                    <div className={`w-5 h-5 rounded-full bg-white shadow m-0.5 transition-all ${checkInAlert.enabled ? "translate-x-4" : ""}`} />
+                       style={{ background: draft.reminders.checkin.enabled ? SAGE : LINE }}
+                       onClick={() => updateReminder("checkin", { enabled: !draft.reminders.checkin.enabled })}>
+                    <div className={`w-5 h-5 rounded-full bg-white shadow m-0.5 transition-all ${draft.reminders.checkin.enabled ? "translate-x-4" : ""}`} />
                   </div>
                 </div>
-                <input type="time" value={checkInAlert.time}
-                  onChange={e => setCheckInAlert(a => ({ ...a, time: e.target.value }))}
+                <input type="time" value={draft.reminders.checkin.time}
+                  onChange={e => updateReminder("checkin", { time: e.target.value })}
                   className="text-sm rounded-lg px-2 py-1 outline-none"
                   style={{ background: CARD, border: `1px solid ${LINE}`, color: NAVY }} />
+              </div>
+            </div>
+
+            {/* Lembretes de tarefa */}
+            <div className="mb-4">
+              <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: TEXT_MUTED }}>Lembretes de Tarefa</p>
+              <div className="space-y-2">
+                {TASK_REMINDERS.map(r => (
+                  <div key={r.id} className="rounded-2xl p-3" style={{ background: CARD }}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-semibold" style={{ color: NAVY }}>{r.icon} {r.label}</span>
+                      <div className="w-10 h-6 rounded-full cursor-pointer transition-all"
+                           style={{ background: draft.reminders[r.id].enabled ? SAGE : LINE }}
+                           onClick={() => updateReminder(r.id, { enabled: !draft.reminders[r.id].enabled })}>
+                        <div className={`w-5 h-5 rounded-full bg-white shadow m-0.5 transition-all ${draft.reminders[r.id].enabled ? "translate-x-4" : ""}`} />
+                      </div>
+                    </div>
+                    <input type="time" value={draft.reminders[r.id].time}
+                      onChange={e => updateReminder(r.id, { time: e.target.value })}
+                      className="text-sm rounded-lg px-2 py-1 outline-none"
+                      style={{ background: CARD, border: `1px solid ${LINE}`, color: NAVY }} />
+                  </div>
+                ))}
+                <div className="rounded-2xl p-3" style={{ background: CARD }}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold" style={{ color: NAVY }}>⏰ Lembrete de âncora</span>
+                    <div className="w-10 h-6 rounded-full cursor-pointer transition-all"
+                         style={{ background: draft.anchorsEnabled ? SAGE : LINE }}
+                         onClick={() => setDraft(prev => ({ ...prev, anchorsEnabled: !prev.anchorsEnabled }))}>
+                      <div className={`w-5 h-5 rounded-full bg-white shadow m-0.5 transition-all ${draft.anchorsEnabled ? "translate-x-4" : ""}`} />
+                    </div>
+                  </div>
+                  <p className="text-[10px] mt-1" style={{ color: TEXT_MUTED }}>
+                    Avisa no horário marcado de cada tarefa-âncora que você define no Planejamento.
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -301,27 +413,27 @@ export default function Perfil() {
             <div className="mb-4">
               <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: TEXT_MUTED }}>Pausas de Recuperação</p>
               <div className="space-y-2">
-                {REMINDERS.map(a => (
-                  <div key={a.id} className="rounded-2xl p-3" style={{ background: CARD }}>
+                {PAUSA_REMINDERS.map(r => (
+                  <div key={r.id} className="rounded-2xl p-3" style={{ background: CARD }}>
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-semibold" style={{ color: NAVY }}>{a.icon} {a.label}</span>
+                      <span className="text-sm font-semibold" style={{ color: NAVY }}>{r.icon} {r.label}</span>
                       <div className="w-10 h-6 rounded-full cursor-pointer transition-all"
-                           style={{ background: pauseAlerts[a.id].enabled ? SAGE : LINE }}
-                           onClick={() => setPauseAlerts(prev => ({ ...prev, [a.id]: { ...prev[a.id], enabled: !prev[a.id].enabled } }))}>
-                        <div className={`w-5 h-5 rounded-full bg-white shadow m-0.5 transition-all ${pauseAlerts[a.id].enabled ? "translate-x-4" : ""}`} />
+                           style={{ background: draft.reminders[r.id].enabled ? SAGE : LINE }}
+                           onClick={() => updateReminder(r.id, { enabled: !draft.reminders[r.id].enabled })}>
+                        <div className={`w-5 h-5 rounded-full bg-white shadow m-0.5 transition-all ${draft.reminders[r.id].enabled ? "translate-x-4" : ""}`} />
                       </div>
                     </div>
-                    <input type="time" value={pauseAlerts[a.id].time}
-                      onChange={e => setPauseAlerts(prev => ({ ...prev, [a.id]: { ...prev[a.id], time: e.target.value } }))}
+                    <input type="time" value={draft.reminders[r.id].time}
+                      onChange={e => updateReminder(r.id, { time: e.target.value })}
                       className="text-sm rounded-lg px-2 py-1 outline-none"
                       style={{ background: CARD, border: `1px solid ${LINE}`, color: NAVY }} />
-                    <p className="text-[10px] mt-1" style={{ color: TEXT_MUTED }}>{a.message}</p>
+                    <p className="text-[10px] mt-1" style={{ color: TEXT_MUTED }}>{r.body}</p>
                   </div>
                 ))}
               </div>
             </div>
 
-            <button onClick={() => { saveReminderSettings(pauseAlerts); setShowNotifications(false); toast.success("Alertas salvos!"); }}
+            <button onClick={() => { saveSettingsMutation.mutate(draft); setShowNotifications(false); }}
               className="w-full h-11 rounded-2xl text-white text-sm font-bold" style={{ background: SAGE }}>
               Salvar alertas
             </button>

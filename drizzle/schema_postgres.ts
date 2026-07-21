@@ -1,9 +1,11 @@
 import {
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   varchar,
   serial,
   boolean
@@ -134,3 +136,54 @@ export const decompositionHistory = pgTable("decomposition_history", {
 
 export type DecompositionHistory = typeof decompositionHistory.$inferSelect;
 export type InsertDecompositionHistory = typeof decompositionHistory.$inferInsert;
+
+/**
+ * Web Push subscriptions (one browser/device registration per row).
+ */
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  endpoint: text("endpoint").notNull().unique(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type PushSubscription = typeof pushSubscriptions.$inferSelect;
+export type InsertPushSubscription = typeof pushSubscriptions.$inferInsert;
+
+/**
+ * Per-user notification preferences (toggles + times for each reminder
+ * kind). Kept as a single jsonb blob rather than one column per kind so new
+ * reminder types don't require a schema migration.
+ */
+export const notificationSettings = pgTable("notification_settings", {
+  userId: integer("user_id").primaryKey(),
+  settings: jsonb("settings").notNull().default({}),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type NotificationSettingsRow = typeof notificationSettings.$inferSelect;
+export type InsertNotificationSettingsRow = typeof notificationSettings.$inferInsert;
+
+/**
+ * Dedupe log: one row per (user, reminder kind, optional task ref, day)
+ * prevents a cron sweep from re-sending the same push twice in one day.
+ */
+export const notificationLog = pgTable("notification_log", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  kind: text("kind").notNull(),
+  // taskId when kind = "anchor"; 0 otherwise. NOT NULL (with 0 as sentinel)
+  // because Postgres unique indexes treat NULL as distinct from every other
+  // NULL, so a nullable refId would let the daily-reminder kinds bypass the
+  // dedupe constraint below and send twice in one day.
+  refId: integer("ref_id").notNull().default(0),
+  sentDate: text("sent_date").notNull(), // "YYYY-MM-DD" in America/Sao_Paulo
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, table => ({
+  uniqueSend: uniqueIndex("notification_log_unique_send").on(table.userId, table.kind, table.refId, table.sentDate),
+}));
+
+export type NotificationLog = typeof notificationLog.$inferSelect;
+export type InsertNotificationLog = typeof notificationLog.$inferInsert;

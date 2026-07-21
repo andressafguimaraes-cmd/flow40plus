@@ -1,7 +1,7 @@
-import { eq, desc, and, gte, count } from "drizzle-orm";
+import { eq, desc, and, gte, count, isNotNull, ne } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
-import { InsertUser, users, morningCheckIns, tasks, microSteps, practices, userPracticeProgress, decompositionHistory } from "../drizzle/schema_postgres";
+import { InsertUser, users, morningCheckIns, tasks, microSteps, practices, userPracticeProgress, decompositionHistory, pushSubscriptions, notificationSettings, notificationLog } from "../drizzle/schema_postgres";
 import { ENV } from './_core/env';
 import { memoryDb } from './db-memory';
 
@@ -547,4 +547,156 @@ export async function getUserDecompositionHistory(userId: number) {
     ...item,
     decomposedData: JSON.parse(item.decomposedData),
   }));
+}
+
+// ===== Push Notification Functions =====
+
+export async function upsertPushSubscription(userId: number, endpoint: string, p256dh: string, auth: string) {
+  const db = await getDb();
+  if (!db) {
+    if (useMemoryFallback) {
+      memoryDb.upsertPushSubscription(userId, endpoint, p256dh, auth);
+      return;
+    }
+    throw new Error("Database not available");
+  }
+
+  await db
+    .insert(pushSubscriptions)
+    .values({ userId, endpoint, p256dh, auth })
+    .onConflictDoUpdate({
+      target: pushSubscriptions.endpoint,
+      set: { userId, p256dh, auth },
+    });
+}
+
+export async function deletePushSubscription(endpoint: string) {
+  const db = await getDb();
+  if (!db) {
+    if (useMemoryFallback) {
+      memoryDb.deletePushSubscription(endpoint);
+      return;
+    }
+    throw new Error("Database not available");
+  }
+
+  await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint));
+}
+
+export async function getPushSubscriptionsForUser(userId: number) {
+  const db = await getDb();
+  if (!db) {
+    if (useMemoryFallback) {
+      return memoryDb.getPushSubscriptionsForUser(userId);
+    }
+    throw new Error("Database not available");
+  }
+
+  return db.select().from(pushSubscriptions).where(eq(pushSubscriptions.userId, userId));
+}
+
+export async function getNotificationSettings(userId: number) {
+  const db = await getDb();
+  if (!db) {
+    if (useMemoryFallback) {
+      return memoryDb.getNotificationSettings(userId);
+    }
+    throw new Error("Database not available");
+  }
+
+  const result = await db.select().from(notificationSettings).where(eq(notificationSettings.userId, userId)).limit(1);
+  return result.length > 0 ? (result[0].settings as Record<string, unknown>) : null;
+}
+
+export async function saveNotificationSettings(userId: number, settings: Record<string, unknown>) {
+  const db = await getDb();
+  if (!db) {
+    if (useMemoryFallback) {
+      memoryDb.saveNotificationSettings(userId, settings);
+      return;
+    }
+    throw new Error("Database not available");
+  }
+
+  await db
+    .insert(notificationSettings)
+    .values({ userId, settings })
+    .onConflictDoUpdate({
+      target: notificationSettings.userId,
+      set: { settings, updatedAt: new Date() },
+    });
+}
+
+// Usado pelo cron diário: varre todas as configurações salvas (uma linha por
+// usuária que já abriu a tela de notificações) e decide em memória quais
+// lembretes batem com o horário atual — mais simples que filtrar por jsonb
+// no SQL, e a tabela tende a ser pequena (uma linha por usuária).
+export async function getAllNotificationSettings() {
+  const db = await getDb();
+  if (!db) {
+    if (useMemoryFallback) {
+      return memoryDb.getAllNotificationSettings();
+    }
+    throw new Error("Database not available");
+  }
+
+  const rows = await db.select().from(notificationSettings);
+  return rows.map(row => ({ userId: row.userId, settings: row.settings as Record<string, unknown> }));
+}
+
+export async function wasNotificationSent(userId: number, kind: string, refId: number, sentDate: string) {
+  const db = await getDb();
+  if (!db) {
+    if (useMemoryFallback) {
+      return memoryDb.wasNotificationSent(userId, kind, refId, sentDate);
+    }
+    throw new Error("Database not available");
+  }
+
+  const result = await db
+    .select({ id: notificationLog.id })
+    .from(notificationLog)
+    .where(and(
+      eq(notificationLog.userId, userId),
+      eq(notificationLog.kind, kind),
+      eq(notificationLog.refId, refId),
+      eq(notificationLog.sentDate, sentDate),
+    ))
+    .limit(1);
+
+  return result.length > 0;
+}
+
+export async function markNotificationSent(userId: number, kind: string, refId: number, sentDate: string) {
+  const db = await getDb();
+  if (!db) {
+    if (useMemoryFallback) {
+      memoryDb.markNotificationSent(userId, kind, refId, sentDate);
+      return;
+    }
+    throw new Error("Database not available");
+  }
+
+  await db.insert(notificationLog).values({ userId, kind, refId, sentDate }).onConflictDoNothing();
+}
+
+// Usado pelo cron de âncoras: tarefas com horário fixo, planejadas pro dia
+// informado, ainda não concluídas.
+export async function getAnchorTasksForDate(date: string) {
+  const db = await getDb();
+  if (!db) {
+    if (useMemoryFallback) {
+      return memoryDb.getAnchorTasksForDate(date);
+    }
+    throw new Error("Database not available");
+  }
+
+  return db
+    .select()
+    .from(tasks)
+    .where(and(
+      eq(tasks.plannedDate, date),
+      isNotNull(tasks.scheduledTime),
+      ne(tasks.status, "completed"),
+    ));
 }

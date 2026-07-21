@@ -70,6 +70,15 @@ interface StoredDecompositionHistory {
   createdAt: Date;
 }
 
+interface StoredPushSubscription {
+  id: number;
+  userId: number;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  createdAt: Date;
+}
+
 class InMemoryDatabase {
   private users: Map<number, StoredUser> = new Map();
   private checkIns: Map<number, StoredCheckIn> = new Map();
@@ -77,6 +86,9 @@ class InMemoryDatabase {
   private microSteps: Map<number, StoredMicroStep> = new Map();
   private practices: Map<number, StoredPractice> = new Map();
   private decompositionHistory: Map<number, StoredDecompositionHistory> = new Map();
+  private pushSubscriptions: Map<number, StoredPushSubscription> = new Map();
+  private notificationSettings: Map<number, Record<string, unknown>> = new Map();
+  private notificationLog: Set<string> = new Set();
 
   private userIdCounter = 1;
   private checkInIdCounter = 1;
@@ -84,6 +96,7 @@ class InMemoryDatabase {
   private microStepIdCounter = 1;
   private practiceIdCounter = 1;
   private decompositionIdCounter = 1;
+  private pushSubscriptionIdCounter = 1;
 
   // Users
   createUser(user: Omit<StoredUser, 'id'>) {
@@ -212,6 +225,11 @@ class InMemoryDatabase {
     }
   }
 
+  getAnchorTasksForDate(date: string) {
+    return Array.from(this.tasks.values())
+      .filter(t => t.plannedDate === date && !!t.scheduledTime && t.status !== "completed");
+  }
+
   deleteTask(taskId: number) {
     // Delete micro-steps first
     const microStepsToDelete = Array.from(this.microSteps.values())
@@ -335,6 +353,52 @@ class InMemoryDatabase {
       }));
   }
 
+  // Push subscriptions
+  upsertPushSubscription(userId: number, endpoint: string, p256dh: string, auth: string) {
+    const existing = Array.from(this.pushSubscriptions.values()).find(s => s.endpoint === endpoint);
+    if (existing) {
+      existing.userId = userId;
+      existing.p256dh = p256dh;
+      existing.auth = auth;
+      return existing;
+    }
+    const id = this.pushSubscriptionIdCounter++;
+    const sub: StoredPushSubscription = { id, userId, endpoint, p256dh, auth, createdAt: new Date() };
+    this.pushSubscriptions.set(id, sub);
+    return sub;
+  }
+
+  deletePushSubscription(endpoint: string) {
+    const existing = Array.from(this.pushSubscriptions.entries()).find(([, s]) => s.endpoint === endpoint);
+    if (existing) this.pushSubscriptions.delete(existing[0]);
+  }
+
+  getPushSubscriptionsForUser(userId: number) {
+    return Array.from(this.pushSubscriptions.values()).filter(s => s.userId === userId);
+  }
+
+  // Notification settings
+  getNotificationSettings(userId: number) {
+    return this.notificationSettings.get(userId) ?? null;
+  }
+
+  saveNotificationSettings(userId: number, settings: Record<string, unknown>) {
+    this.notificationSettings.set(userId, settings);
+  }
+
+  getAllNotificationSettings() {
+    return Array.from(this.notificationSettings.entries()).map(([userId, settings]) => ({ userId, settings }));
+  }
+
+  // Notification dedupe log
+  wasNotificationSent(userId: number, kind: string, refId: number, sentDate: string) {
+    return this.notificationLog.has(`${userId}:${kind}:${refId}:${sentDate}`);
+  }
+
+  markNotificationSent(userId: number, kind: string, refId: number, sentDate: string) {
+    this.notificationLog.add(`${userId}:${kind}:${refId}:${sentDate}`);
+  }
+
   // Utilities
   clear() {
     this.users.clear();
@@ -343,6 +407,9 @@ class InMemoryDatabase {
     this.microSteps.clear();
     this.practices.clear();
     this.decompositionHistory.clear();
+    this.pushSubscriptions.clear();
+    this.notificationSettings.clear();
+    this.notificationLog.clear();
   }
 
   getStats() {
@@ -353,6 +420,8 @@ class InMemoryDatabase {
       microSteps: this.microSteps.size,
       practices: this.practices.size,
       decompositionHistory: this.decompositionHistory.size,
+      pushSubscriptions: this.pushSubscriptions.size,
+      notificationSettings: this.notificationSettings.size,
     };
   }
 }

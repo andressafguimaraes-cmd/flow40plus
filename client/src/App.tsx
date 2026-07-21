@@ -13,7 +13,6 @@ import { useState, useEffect } from "react";
 import Login from "@/pages/Login";
 import { useAuth } from "@/hooks/useAuth";
 import Logo from "@/components/Logo";
-import { useReminders } from "@/hooks/useReminders";
 import Termos from "@/pages/Termos";
 import Ajuda from "@/pages/Ajuda";
 
@@ -23,8 +22,6 @@ function AppShell() {
   const [location, setLocation] = useLocation();
   const [showCheckIn, setShowCheckIn] = useState(false);
   const { user, loading, isAuthenticated } = useAuth();
-
-  useReminders(isAuthenticated);
 
   // Mostra o check-in como pop-up na primeira visita do dia
   useEffect(() => {

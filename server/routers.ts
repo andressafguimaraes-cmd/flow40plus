@@ -12,6 +12,8 @@ import { getGoogleAuthUrl, getTokensFromCode, exportTaskToCalendar, createFlowCa
 import * as googleCalendarDb from "./db-google-calendar";
 import type { User } from "../drizzle/schema_postgres";
 import type { TrpcContext } from "./_core/context";
+import { ENV } from "./_core/env";
+import { mergeNotificationSettings } from "@shared/notificationSettings";
 
 // Never send the password hash to the client.
 function toSafeUser(user: User) {
@@ -751,6 +753,56 @@ export const appRouter = router({
         }
         // Log practice completion
         await db.logPracticeProgress(ctx.user.id, input.practiceId);
+        return { success: true };
+      }),
+  }),
+
+  notifications: router({
+    getVapidPublicKey: publicProcedure
+      .query(() => ENV.vapidPublicKey),
+
+    subscribe: publicProcedure
+      .input(z.object({
+        endpoint: z.string(),
+        keys: z.object({
+          p256dh: z.string(),
+          auth: z.string(),
+        }),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) {
+          throw new Error("User not authenticated");
+        }
+        await db.upsertPushSubscription(ctx.user.id, input.endpoint, input.keys.p256dh, input.keys.auth);
+        return { success: true };
+      }),
+
+    unsubscribe: publicProcedure
+      .input(z.object({ endpoint: z.string() }))
+      .mutation(async ({ input }) => {
+        await db.deletePushSubscription(input.endpoint);
+        return { success: true };
+      }),
+
+    getSettings: publicProcedure
+      .query(async ({ ctx }) => {
+        if (!ctx.user) {
+          throw new Error("User not authenticated");
+        }
+        const saved = await db.getNotificationSettings(ctx.user.id);
+        return mergeNotificationSettings(saved);
+      }),
+
+    saveSettings: publicProcedure
+      .input(z.object({
+        anchorsEnabled: z.boolean(),
+        reminders: z.record(z.string(), z.object({ enabled: z.boolean(), time: z.string() })),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) {
+          throw new Error("User not authenticated");
+        }
+        await db.saveNotificationSettings(ctx.user.id, input);
         return { success: true };
       }),
   }),

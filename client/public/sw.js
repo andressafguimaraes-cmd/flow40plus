@@ -43,3 +43,42 @@ self.addEventListener("fetch", event => {
     })
   );
 });
+
+// Push do servidor (ver server/_core/cronRoutes.ts) chega aqui mesmo com o
+// app fechado — o payload é {title, body, url} em JSON.
+self.addEventListener("push", event => {
+  let data = { title: "Flow40+", body: "" };
+  try {
+    if (event.data) data = { ...data, ...event.data.json() };
+  } catch {
+    // payload não veio em JSON — mantém o fallback acima
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
+      data: { url: data.url || "/dashboard" },
+    })
+  );
+});
+
+// Ao tocar na notificação, foca uma aba já aberta do app (navegando pra URL
+// do payload) ou abre uma nova se não houver nenhuma.
+self.addEventListener("notificationclick", event => {
+  event.notification.close();
+  const targetUrl = event.notification.data?.url || "/dashboard";
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(clients => {
+      for (const client of clients) {
+        if ("focus" in client) {
+          client.navigate(targetUrl);
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow(targetUrl);
+    })
+  );
+});
