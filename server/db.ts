@@ -570,6 +570,21 @@ export async function upsertPushSubscription(userId: number, endpoint: string, p
     });
 }
 
+// Usado pelo broadcast de aviso geral: uma usuária pode ter várias
+// inscrições (mais de um aparelho/navegador), então agrupa por userId.
+export async function getAllUserIdsWithPushSubscriptions() {
+  const db = await getDb();
+  if (!db) {
+    if (useMemoryFallback) {
+      return memoryDb.getAllUserIdsWithPushSubscriptions();
+    }
+    throw new Error("Database not available");
+  }
+
+  const rows = await db.selectDistinct({ userId: pushSubscriptions.userId }).from(pushSubscriptions);
+  return rows.map(r => r.userId);
+}
+
 export async function deletePushSubscription(endpoint: string) {
   const db = await getDb();
   if (!db) {

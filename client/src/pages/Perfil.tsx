@@ -57,6 +57,7 @@ export default function Perfil() {
   const saveSettingsMutation = trpc.notifications.saveSettings.useMutation({ onSuccess: () => toast.success("Alertas salvos!") });
   const subscribeMutation = trpc.notifications.subscribe.useMutation();
   const unsubscribeMutation = trpc.notifications.unsubscribe.useMutation();
+  const broadcastMutation = trpc.notifications.broadcast.useMutation();
 
   const [photo, setPhoto] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -64,6 +65,9 @@ export default function Perfil() {
   const [editingProfile, setEditingProfile] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [isVaultOpen, setIsVaultOpen] = useState(false);
+  const [showBroadcast, setShowBroadcast] = useState(false);
+  const [broadcastTitle, setBroadcastTitle] = useState("");
+  const [broadcastBody, setBroadcastBody] = useState("");
   const [draft, setDraft] = useState<NotificationSettings>(defaultNotificationSettings());
   const [pushEnabled, setPushEnabled] = useState(false);
   const [enablingPush, setEnablingPush] = useState(false);
@@ -100,6 +104,19 @@ export default function Perfil() {
 
   const updateReminder = (id: keyof NotificationSettings["reminders"], patch: Partial<{ enabled: boolean; time: string }>) =>
     setDraft(prev => ({ ...prev, reminders: { ...prev.reminders, [id]: { ...prev.reminders[id], ...patch } } }));
+
+  const handleSendBroadcast = async () => {
+    if (!broadcastTitle.trim() || !broadcastBody.trim()) return;
+    try {
+      const result = await broadcastMutation.mutateAsync({ title: broadcastTitle.trim(), body: broadcastBody.trim() });
+      toast.success(`Aviso enviado para ${result.sent} de ${result.total} usuárias.`);
+      setShowBroadcast(false);
+      setBroadcastTitle("");
+      setBroadcastBody("");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Erro ao enviar aviso.");
+    }
+  };
 
   useEffect(() => {
     if (user) {
@@ -243,6 +260,20 @@ export default function Perfil() {
             ))}
           </div>
         </div>
+
+        {/* Admin: aviso geral */}
+        {user?.role === "admin" && (
+          <div className="mb-5">
+            <p className="text-[11.5px] font-bold uppercase mb-2" style={{ color: TEXT_MUTED, letterSpacing: "0.5px" }}>Admin</p>
+            <div className="rounded-[18px] overflow-hidden" style={{ background: CARD, boxShadow: "0 2px 10px rgba(22,54,90,0.03)" }}>
+              <button onClick={() => setShowBroadcast(true)} className="w-full flex items-center gap-3.5 px-4 py-3.5 text-left">
+                <span className="text-base w-5 text-center" style={{ color: NAVY }}>📢</span>
+                <span className="flex-1 text-[13.5px] font-semibold" style={{ color: NAVY }}>Enviar aviso geral</span>
+                <span className="text-xs" style={{ color: "#C4CBC4" }}>›</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Sair */}
         <div className="mb-4">
@@ -437,6 +468,59 @@ export default function Perfil() {
               className="w-full h-11 rounded-2xl text-white text-sm font-bold" style={{ background: SAGE }}>
               Salvar alertas
             </button>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Modal: Enviar aviso geral (admin) */}
+      {showBroadcast && createPortal(
+        <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(22,54,90,0.4)" }}>
+          <div className="w-full max-w-md rounded-t-3xl p-5" style={{ background: BG_APP }}>
+            <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: LINE }} />
+            <h3 className="text-base font-bold mb-1" style={{ color: NAVY }}>📢 Enviar aviso geral</h3>
+            <p className="text-xs font-medium mb-4" style={{ color: TEXT_MUTED }}>
+              Manda uma notificação push pra todas as usuárias que já ativaram notificações — use com moderação.
+            </p>
+
+            <label className="text-xs font-semibold mb-1.5 block" style={{ color: TEXT_MUTED }}>Título</label>
+            <input
+              value={broadcastTitle}
+              onChange={e => setBroadcastTitle(e.target.value)}
+              maxLength={80}
+              placeholder="Ex.: Nova atualização disponível!"
+              className="w-full text-sm rounded-xl px-3.5 py-2.5 outline-none mb-3"
+              style={{ border: `1px solid ${LINE}`, color: NAVY, background: CARD }}
+            />
+
+            <label className="text-xs font-semibold mb-1.5 block" style={{ color: TEXT_MUTED }}>Mensagem</label>
+            <textarea
+              value={broadcastBody}
+              onChange={e => setBroadcastBody(e.target.value)}
+              maxLength={200}
+              rows={3}
+              placeholder="Ex.: Adicionamos lembretes de tarefa e um jeito melhor de planejar o dia."
+              className="w-full text-sm rounded-xl px-3.5 py-2.5 outline-none mb-5 resize-none"
+              style={{ border: `1px solid ${LINE}`, color: NAVY, background: CARD }}
+            />
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowBroadcast(false)}
+                className="flex-1 h-11 rounded-2xl text-sm font-bold"
+                style={{ border: `1px solid ${LINE}`, color: TEXT_MUTED }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSendBroadcast}
+                disabled={!broadcastTitle.trim() || !broadcastBody.trim() || broadcastMutation.isPending}
+                className="flex-1 h-11 rounded-2xl text-white text-sm font-bold disabled:opacity-50"
+                style={{ background: SAGE }}
+              >
+                {broadcastMutation.isPending ? "Enviando..." : "Enviar"}
+              </button>
+            </div>
           </div>
         </div>,
         document.body

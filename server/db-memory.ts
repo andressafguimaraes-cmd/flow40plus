@@ -377,6 +377,10 @@ class InMemoryDatabase {
     return Array.from(this.pushSubscriptions.values()).filter(s => s.userId === userId);
   }
 
+  getAllUserIdsWithPushSubscriptions() {
+    return Array.from(new Set(Array.from(this.pushSubscriptions.values()).map(s => s.userId)));
+  }
+
   // Notification settings
   getNotificationSettings(userId: number) {
     return this.notificationSettings.get(userId) ?? null;

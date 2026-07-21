@@ -1,4 +1,4 @@
-import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { COOKIE_NAME, ONE_YEAR_MS, NOT_ADMIN_ERR_MSG } from "@shared/const";
 import { TRPCError } from "@trpc/server";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { hashPassword, verifyPassword } from "./_core/password";
@@ -13,6 +13,7 @@ import * as googleCalendarDb from "./db-google-calendar";
 import type { User } from "../drizzle/schema_postgres";
 import type { TrpcContext } from "./_core/context";
 import { ENV } from "./_core/env";
+import { sendPushToUser } from "./_core/push";
 import { mergeNotificationSettings } from "@shared/notificationSettings";
 
 // Never send the password hash to the client.
@@ -804,6 +805,33 @@ export const appRouter = router({
         }
         await db.saveNotificationSettings(ctx.user.id, input);
         return { success: true };
+      }),
+
+    // Aviso geral (ex.: "nova versão disponível") — enviado sob demanda,
+    // não faz parte da varredura agendada do cron. Restrito a admin.
+    broadcast: publicProcedure
+      .input(z.object({
+        title: z.string().trim().min(1).max(80),
+        body: z.string().trim().min(1).max(200),
+        url: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) {
+          throw new Error("User not authenticated");
+        }
+        if (ctx.user.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
+        }
+
+        const userIds = await db.getAllUserIdsWithPushSubscriptions();
+        const results = await Promise.allSettled(
+          userIds.map(userId =>
+            sendPushToUser(userId, { title: input.title, body: input.body, url: input.url || "/dashboard" })
+          )
+        );
+        const failed = results.filter(r => r.status === "rejected").length;
+
+        return { sent: userIds.length - failed, total: userIds.length };
       }),
   }),
 });
