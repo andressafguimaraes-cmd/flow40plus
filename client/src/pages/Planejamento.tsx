@@ -125,6 +125,15 @@ export default function Planejamento() {
     setDayPickerTaskId(null);
   };
 
+  const dayPickerTask = allTasks.find(t => t.id === dayPickerTaskId) ?? null;
+
+  const handleRemoveDate = () => {
+    if (dayPickerTaskId == null) return;
+    setPlannedDate.mutate({ taskId: dayPickerTaskId, plannedDate: null });
+    toast.success("Tarefa voltou para sem data.");
+    setDayPickerTaskId(null);
+  };
+
   return (
     <div className="min-h-screen pb-24" style={{ background: BG_APP }}>
       <div className="px-5 pt-6">
@@ -388,6 +397,15 @@ export default function Planejamento() {
             <p className="text-[11px] font-medium mb-4" style={{ color: TEXT_MUTED }}>
               Para escolher outra semana, navegue pelas setas ‹ › antes de tocar na tarefa.
             </p>
+            {dayPickerTask?.plannedDate && (
+              <button
+                onClick={handleRemoveDate}
+                className="w-full h-11 rounded-2xl text-sm font-bold mb-3"
+                style={{ border: `1px solid ${LINE}`, color: SAGE_DARK }}
+              >
+                Remover data (deixar sem data)
+              </button>
+            )}
             <button onClick={() => setDayPickerTaskId(null)} className="w-full h-11 rounded-2xl text-sm font-bold" style={{ border: `1px solid ${LINE}`, color: TEXT_MUTED }}>
               Cancelar
             </button>

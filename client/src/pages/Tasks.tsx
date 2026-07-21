@@ -346,7 +346,7 @@ export default function Tasks() {
           <div className="relative rounded-[14px] flex items-center px-3.5" style={{ background: BG_APP, border: `1px solid ${LINE}`, height: 44 }}>
             <input
               value={taskInput} onChange={e => setTaskInput(e.target.value)}
-              placeholder="Qual tarefa você quer capturar?"
+              placeholder="Tire da sua mente"
               className="flex-1 bg-transparent outline-none text-[13.5px] pr-7"
               style={{ color: NAVY }}
             />
@@ -382,12 +382,23 @@ export default function Tasks() {
 
           <button
             onClick={() => setAiActive(v => !v)}
-            className="flex items-center gap-2 rounded-[14px] px-3.5 text-[12.5px]"
-            style={aiActive
-              ? { height: 44, color: TEXT_MUTED, border: `1px solid ${LINE}`, background: BG_APP, fontWeight: 500 }
-              : { height: 44, color: SAGE_DARK, border: `1px solid ${SAGE}`, background: "#E4EFE6", fontWeight: 600 }}
+            className="flex items-center gap-2.5 rounded-[14px] px-3.5 text-[12.5px]"
+            style={{ height: 44, color: SAGE_DARK, border: `1px solid ${SAGE}`, background: "#E4EFE6", fontWeight: 600 }}
           >
-            <span style={{ color: aiActive ? TEXT_MUTED : SAGE_DARK, fontSize: 14 }}>✨</span> Dividir em microtarefas com IA
+            <span
+              className="flex items-center justify-center rounded-[5px] flex-shrink-0"
+              style={{
+                width: 18,
+                height: 18,
+                border: `1.5px solid ${SAGE_DARK}`,
+                background: aiActive ? SAGE_DARK : "transparent",
+                color: "#fff",
+                fontSize: 11,
+              }}
+            >
+              {aiActive && "✓"}
+            </span>
+            <span style={{ color: SAGE_DARK, fontSize: 14 }}>✨</span> Dividir em microtarefas com IA
           </button>
 
           <button
@@ -476,7 +487,7 @@ export default function Tasks() {
                   style={{ color: NAVY }}
                 >
                   {PRIORITIES.map(p => (
-                    <option key={p.key} value={p.key}>🏳️ {p.label}</option>
+                    <option key={p.key} value={p.key} style={{ color: p.accent }}>● {p.label}</option>
                   ))}
                 </select>
               </div>
