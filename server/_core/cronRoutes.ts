@@ -30,8 +30,16 @@ function brazilNow(): { date: string; time: string } {
 // missed or duplicated (guarded by notification_log).
 export function registerCronRoutes(app: Express) {
   app.get("/api/cron/notifications", async (req, res) => {
+    // Aceita o segredo tanto no header (Authorization: Bearer ...) quanto
+    // via ?secret=... na URL — alguns serviços de cron gratuitos (ex.
+    // cron-job.org) não deixam configurar headers customizados com
+    // facilidade, então um link com o segredo embutido é mais prático.
     const authHeader = req.headers.authorization;
-    if (!ENV.cronSecret || authHeader !== `Bearer ${ENV.cronSecret}`) {
+    const querySecret = req.query.secret;
+    const authorized =
+      (!!ENV.cronSecret && authHeader === `Bearer ${ENV.cronSecret}`) ||
+      (!!ENV.cronSecret && querySecret === ENV.cronSecret);
+    if (!authorized) {
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
