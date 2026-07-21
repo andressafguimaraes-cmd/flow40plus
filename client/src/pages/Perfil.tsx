@@ -292,8 +292,16 @@ export default function Perfil() {
 
       {/* Modal: Meu Baú de Gratidão */}
       {isVaultOpen && createPortal(
-        <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(22,54,90,0.4)" }}>
-          <div className="w-full max-w-md rounded-t-[32px] p-6 max-h-[75vh] flex flex-col" style={{ background: BG_APP }}>
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center"
+          style={{ background: "rgba(22,54,90,0.4)" }}
+          onClick={() => setIsVaultOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-t-[32px] p-6 max-h-[75vh] flex flex-col"
+            style={{ background: BG_APP }}
+            onClick={e => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between mb-4 flex-shrink-0">
               <span className="text-base font-bold" style={{ color: NAVY }}>✨ Meu Baú de Gratidão</span>
               <button
@@ -325,8 +333,12 @@ export default function Perfil() {
 
       {/* Modal: Editar perfil */}
       {editingProfile && createPortal(
-        <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(22,54,90,0.4)" }}>
-          <div className="w-full max-w-md rounded-t-3xl p-5" style={{ background: BG_APP }}>
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center"
+          style={{ background: "rgba(22,54,90,0.4)" }}
+          onClick={() => setEditingProfile(false)}
+        >
+          <div className="w-full max-w-md rounded-t-3xl p-5" style={{ background: BG_APP }} onClick={e => e.stopPropagation()}>
             <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: LINE }} />
             <h3 className="text-base font-bold mb-4" style={{ color: NAVY }}>Editar Perfil</h3>
             <div className="space-y-3">
@@ -355,10 +367,28 @@ export default function Perfil() {
 
       {/* Modal: Notificações e Lembretes */}
       {showNotifications && createPortal(
-        <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(22,54,90,0.4)" }}>
-          <div className="w-full max-w-md rounded-t-3xl p-5 max-h-[80vh] overflow-y-auto" style={{ background: BG_APP }}>
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center"
+          style={{ background: "rgba(22,54,90,0.4)" }}
+          onClick={() => setShowNotifications(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-t-3xl p-5 max-h-[80vh] overflow-y-auto"
+            style={{ background: BG_APP }}
+            onClick={e => e.stopPropagation()}
+          >
             <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: LINE }} />
-            <h3 className="text-base font-bold mb-4" style={{ color: NAVY }}>Notificações e Lembretes</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-bold" style={{ color: NAVY }}>Notificações e Lembretes</h3>
+              <button
+                onClick={() => setShowNotifications(false)}
+                className="w-7 h-7 rounded-full flex items-center justify-center text-sm flex-shrink-0"
+                style={{ color: TEXT_MUTED, background: CARD }}
+                aria-label="Fechar"
+              >
+                ✕
+              </button>
+            </div>
 
             {/* Ativação de push */}
             <div className="mb-4 rounded-2xl p-3" style={{ background: CARD }}>
@@ -475,8 +505,12 @@ export default function Perfil() {
 
       {/* Modal: Enviar aviso geral (admin) */}
       {showBroadcast && createPortal(
-        <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(22,54,90,0.4)" }}>
-          <div className="w-full max-w-md rounded-t-3xl p-5" style={{ background: BG_APP }}>
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center"
+          style={{ background: "rgba(22,54,90,0.4)" }}
+          onClick={() => setShowBroadcast(false)}
+        >
+          <div className="w-full max-w-md rounded-t-3xl p-5" style={{ background: BG_APP }} onClick={e => e.stopPropagation()}>
             <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: LINE }} />
             <h3 className="text-base font-bold mb-1" style={{ color: NAVY }}>📢 Enviar aviso geral</h3>
             <p className="text-xs font-medium mb-4" style={{ color: TEXT_MUTED }}>
