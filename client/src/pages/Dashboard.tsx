@@ -31,7 +31,10 @@ interface ScoredTask {
   progress: number;
 }
 
-function calcularScore(tarefa: ScoredTask, energia: number) {
+// "capacidade" é a média de sono+energia+clareza — não só energia. Os três
+// entram no mesmo peso porque uma noite ruim ou a mente nublada afetam a
+// tarefa certa pro momento tanto quanto a energia isolada.
+function calcularScore(tarefa: ScoredTask, capacidade: number) {
   let score = 0;
   let motivo = "";
   const forcarTopo = tarefa.priority === "urgente";
@@ -41,10 +44,10 @@ function calcularScore(tarefa: ScoredTask, energia: number) {
   if (forcarTopo) {
     score += 1000;
     motivo = "urgente";
-  } else if (energia >= 4) {
+  } else if (capacidade >= 4) {
     if (tarefa.priority === "alta") { score += 100; motivo = "alta_energia"; }
     score += duracao * 0.5;
-  } else if (energia === 3) {
+  } else if (capacidade === 3) {
     if (tarefa.priority === "media") { score += 80; motivo = motivo || "energia_media"; }
     if (isMicro) { score += 60; motivo = motivo || "energia_media"; }
   } else {
@@ -60,14 +63,40 @@ function calcularScore(tarefa: ScoredTask, energia: number) {
   return { score, motivo, forcarTopo };
 }
 
-function escolherRecomendacao(lista: ScoredTask[], energia: number) {
+function escolherRecomendacao(lista: ScoredTask[], capacidade: number) {
   let melhor: { tarefa: ScoredTask; r: ReturnType<typeof calcularScore> } | null = null;
   for (const t of lista) {
-    const r = calcularScore(t, energia);
+    const r = calcularScore(t, capacidade);
     if (!melhor || r.score > melhor.r.score) melhor = { tarefa: t, r };
   }
   return melhor;
 }
+
+function dateKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function minutesSinceMidnight(d: Date) {
+  return d.getHours() * 60 + d.getMinutes();
+}
+
+function parseHM(hm: string): number {
+  const [h, m] = hm.split(":").map(Number);
+  return h * 60 + m;
+}
+
+// Âncora só vira "a próxima melhor decisão" a partir de 60min antes do
+// horário marcado — antes disso ela fica só visível no Planejamento, sem
+// sequestrar a recomendação do Dashboard.
+const ANCHOR_LEAD_MINUTES = 60;
+
+// Depois que a pausa sugerida é aceita, não insiste em "descanse" de novo
+// por um tempo — no próximo carregamento, tenta sugerir uma tarefa leve.
+const REST_COOLDOWN_MS = 25 * 60 * 1000;
+const REST_KEY = "flow40_rest_suggested_at";
 
 function frasePrioridade(tarefa: ScoredTask, forcarTopo: boolean) {
   if (forcarTopo) return "Prioridade #1 do dia";
@@ -115,21 +144,44 @@ export default function Dashboard({ onOpenCheckIn }: DashboardProps) {
   const clareza = todayCheckIn?.mentalClarity ?? (weeklyStats?.averageClarity ? Math.round(weeklyStats.averageClarity) : 3);
 
   const suggestedPractice = useSuggestedPractice({ sleepScore: sono, energyScore: energia, clarityScore: clareza });
+  const capacidade = Math.round((sono + energia + clareza) / 3);
 
   const allTasks = userTasks ?? [];
-  const pendentes = allTasks.filter(t => t.status !== "completed");
+  const todosPendentes = allTasks.filter(t => t.status !== "completed");
 
-  const cenario: "fluxo" | "sobrecarga" | "cansaco" = modoMenor
-    ? "sobrecarga"
-    : energia >= 4
-      ? "fluxo"
-      : energia <= 2
-        ? (pendentes.length >= 4 ? "sobrecarga" : "cansaco")
-        : "fluxo";
+  // Só concorrem tarefas de hoje (ou sem data — backlog livre). Tarefas
+  // planejadas para outro dia não entram na disputa, senão a recomendação
+  // ignora completamente o que a usuária já organizou no Planejamento.
+  const hoje = dateKey(new Date());
+  const pendentesHoje = todosPendentes.filter(t => t.plannedDate === hoje || !t.plannedDate);
 
-  const poolBase = modoMenor ? pendentes.filter(t => (t.totalEstimatedTime ?? 999) <= 20) : pendentes;
-  const pool = poolBase.length > 0 ? poolBase : pendentes;
-  const melhor = pool.length > 0 ? escolherRecomendacao(pool, energia) : null;
+  // Âncoras (horário fixo) só disputam a recomendação dentro da janela de
+  // antecedência — fora dela ficam só visíveis no Planejamento, sem
+  // aparecer fora de hora no Dashboard.
+  const nowMinutes = minutesSinceMidnight(new Date());
+  const ancorasHoje = pendentesHoje.filter(t => !!t.scheduledTime);
+  const ancoraDevida = ancorasHoje
+    .filter(t => parseHM(t.scheduledTime!) - ANCHOR_LEAD_MINUTES <= nowMinutes)
+    .sort((a, b) => parseHM(a.scheduledTime!) - parseHM(b.scheduledTime!))[0] ?? null;
+
+  const flexiveisHoje = pendentesHoje.filter(t => !t.scheduledTime);
+
+  const [restSuggestedAt, setRestSuggestedAt] = useState(() => Number(localStorage.getItem(REST_KEY)) || 0);
+  const descansoRecente = Date.now() - restSuggestedAt < REST_COOLDOWN_MS;
+
+  const cenario: "ancora" | "fluxo" | "sobrecarga" | "cansaco" = ancoraDevida
+    ? "ancora"
+    : modoMenor
+      ? "sobrecarga"
+      : capacidade >= 4
+        ? "fluxo"
+        : capacidade <= 2 && !descansoRecente
+          ? (flexiveisHoje.length >= 4 ? "sobrecarga" : "cansaco")
+          : "fluxo";
+
+  const poolBase = modoMenor ? flexiveisHoje.filter(t => (t.totalEstimatedTime ?? 999) <= 20) : flexiveisHoje;
+  const pool = poolBase.length > 0 ? poolBase : flexiveisHoje;
+  const melhor = pool.length > 0 ? escolherRecomendacao(pool, capacidade) : null;
 
   interface CardContent {
     eyebrow: string;
@@ -145,7 +197,20 @@ export default function Dashboard({ onOpenCheckIn }: DashboardProps) {
 
   let card: CardContent | null = null;
 
-  if (cenario === "cansaco" || !melhor) {
+  if (cenario === "ancora" && ancoraDevida) {
+    const tarefa = ancoraDevida;
+    card = {
+      eyebrow: "Hora do seu compromisso marcado:",
+      title: tarefa.title,
+      attrPrio: `Agendada para ${tarefa.scheduledTime}`,
+      attrEnergia: "Compromisso fixo do seu dia",
+      attrTime: tarefa.totalEstimatedTime != null ? `Aproximadamente ${tarefa.totalEstimatedTime} minutos` : "Duração não estimada",
+      justif: "Você marcou um horário fixo para esta tarefa — hora de começar.",
+      btnLabel: "▶ Começar agora",
+      btnColor: SAGE,
+      onClick: () => setLocation("/tasks"),
+    };
+  } else if (cenario === "cansaco" || !melhor) {
     card = {
       eyebrow: "Notamos que você está mais devagar hoje...",
       title: "Sua mente pediu uma pausa.",
@@ -155,7 +220,11 @@ export default function Dashboard({ onOpenCheckIn }: DashboardProps) {
       justif: "Você já rendeu bastante hoje. Descansar também é produtivo — não é preciso justificar a pausa.",
       btnLabel: "🌿 Fazer pausa de 5 min",
       btnColor: SAGE,
-      onClick: () => toast.success(`${suggestedPractice.icone} ${suggestedPractice.titulo} — ${suggestedPractice.descricao}`),
+      onClick: () => {
+        localStorage.setItem(REST_KEY, String(Date.now()));
+        setRestSuggestedAt(Date.now());
+        toast.success(`${suggestedPractice.icone} ${suggestedPractice.titulo} — ${suggestedPractice.descricao}`);
+      },
     };
   } else if (cenario === "sobrecarga") {
     const { tarefa } = melhor;
