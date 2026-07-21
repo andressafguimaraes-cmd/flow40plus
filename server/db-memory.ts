@@ -36,6 +36,9 @@ interface StoredTask {
   status: 'pending' | 'in_progress' | 'completed';
   scheduledTime?: string | null;
   plannedDate?: string | null;
+  recurrenceRule?: string | null;
+  recurrenceEndDate?: string | null;
+  seriesId?: number | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -172,6 +175,9 @@ class InMemoryDatabase {
       status: 'pending',
       scheduledTime: null,
       plannedDate: null,
+      recurrenceRule: null,
+      recurrenceEndDate: null,
+      seriesId: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -228,6 +234,51 @@ class InMemoryDatabase {
   getAnchorTasksForDate(date: string) {
     return Array.from(this.tasks.values())
       .filter(t => t.plannedDate === date && !!t.scheduledTime && t.status !== "completed");
+  }
+
+  updateTaskRecurrence(taskId: number, rule: string | null, endDate: string | null) {
+    const task = this.tasks.get(taskId);
+    if (task) {
+      task.recurrenceRule = rule;
+      task.recurrenceEndDate = endDate;
+      task.updatedAt = new Date();
+    }
+  }
+
+  getActiveRecurrenceRoots() {
+    return Array.from(this.tasks.values()).filter(t => !!t.recurrenceRule);
+  }
+
+  getOccurrenceDatesForSeries(seriesId: number): Set<string> {
+    const dates = Array.from(this.tasks.values())
+      .filter(t => t.seriesId === seriesId && t.plannedDate != null)
+      .map(t => t.plannedDate as string);
+    return new Set(dates);
+  }
+
+  createTaskOccurrence(
+    root: { userId: number; title: string; priority: StoredTask["priority"] | null | undefined; totalEstimatedTime: number | null | undefined; scheduledTime: string | null | undefined },
+    seriesId: number,
+    plannedDate: string
+  ) {
+    const id = this.taskIdCounter++;
+    const task: StoredTask = {
+      id,
+      userId: root.userId,
+      title: root.title,
+      priority: root.priority ?? "sem",
+      totalEstimatedTime: root.totalEstimatedTime ?? undefined,
+      status: "pending",
+      scheduledTime: root.scheduledTime,
+      plannedDate,
+      recurrenceRule: null,
+      recurrenceEndDate: null,
+      seriesId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.tasks.set(id, task);
+    return { insertId: id };
   }
 
   deleteTask(taskId: number) {

@@ -311,6 +311,84 @@ export async function updateTaskDetails(taskId: number, updates: { title?: strin
   await db.update(tasks).set({ ...updates, updatedAt: new Date() }).where(eq(tasks.id, taskId));
 }
 
+// ===== Recorrência de tarefas =====
+
+export async function updateTaskRecurrence(taskId: number, rule: string | null, endDate: string | null) {
+  const db = await getDb();
+  if (!db) {
+    if (useMemoryFallback) {
+      memoryDb.updateTaskRecurrence(taskId, rule, endDate);
+      return;
+    }
+    throw new Error("Database not available");
+  }
+
+  await db
+    .update(tasks)
+    .set({ recurrenceRule: rule, recurrenceEndDate: endDate, updatedAt: new Date() })
+    .where(eq(tasks.id, taskId));
+}
+
+// Tarefas-raiz: as que carregam a regra de repetição. Usado pelo cron pra
+// saber quais séries ainda precisam gerar ocorrências futuras.
+export async function getActiveRecurrenceRoots() {
+  const db = await getDb();
+  if (!db) {
+    if (useMemoryFallback) {
+      return memoryDb.getActiveRecurrenceRoots();
+    }
+    throw new Error("Database not available");
+  }
+
+  return db.select().from(tasks).where(isNotNull(tasks.recurrenceRule));
+}
+
+// Datas (YYYY-MM-DD) que já têm ocorrência gerada pra uma série — usado pra
+// não duplicar quando o cron roda de novo.
+export async function getOccurrenceDatesForSeries(seriesId: number): Promise<Set<string>> {
+  const db = await getDb();
+  if (!db) {
+    if (useMemoryFallback) {
+      return memoryDb.getOccurrenceDatesForSeries(seriesId);
+    }
+    throw new Error("Database not available");
+  }
+
+  const rows = await db
+    .select({ plannedDate: tasks.plannedDate })
+    .from(tasks)
+    .where(eq(tasks.seriesId, seriesId));
+
+  return new Set(rows.map(r => r.plannedDate).filter((d): d is string => d != null));
+}
+
+export async function createTaskOccurrence(root: {
+  userId: number;
+  title: string;
+  priority: "urgente" | "alta" | "media" | "baixa" | "sem" | null | undefined;
+  totalEstimatedTime: number | null | undefined;
+  scheduledTime: string | null | undefined;
+}, seriesId: number, plannedDate: string) {
+  const db = await getDb();
+  if (!db) {
+    if (useMemoryFallback) {
+      memoryDb.createTaskOccurrence(root, seriesId, plannedDate);
+      return;
+    }
+    throw new Error("Database not available");
+  }
+
+  await db.insert(tasks).values({
+    userId: root.userId,
+    title: root.title,
+    priority: root.priority ?? "sem",
+    totalEstimatedTime: root.totalEstimatedTime ?? undefined,
+    scheduledTime: root.scheduledTime,
+    plannedDate,
+    seriesId,
+  });
+}
+
 export async function deleteTask(taskId: number) {
   const db = await getDb();
   if (!db) {

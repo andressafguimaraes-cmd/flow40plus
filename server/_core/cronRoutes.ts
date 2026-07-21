@@ -2,6 +2,7 @@ import type { Express } from "express";
 import * as db from "../db";
 import { ENV } from "./env";
 import { sendPushToUser } from "./push";
+import { generateUpcomingOccurrences } from "./recurrence";
 import { TIMED_REMINDERS, mergeNotificationSettings } from "@shared/notificationSettings";
 
 function brazilNow(): { date: string; time: string } {
@@ -45,9 +46,17 @@ export function registerCronRoutes(app: Express) {
     }
 
     const { date: today, time: nowHM } = brazilNow();
-    const results = { dailySent: 0, anchorsSent: 0, errors: 0 };
+    const results = { dailySent: 0, anchorsSent: 0, errors: 0, occurrencesCreated: 0 };
 
     try {
+      try {
+        const { created } = await generateUpcomingOccurrences(today);
+        results.occurrencesCreated = created;
+      } catch (error) {
+        console.error("[Cron] Recurrence generation failed:", error);
+        results.errors++;
+      }
+
       const allSettings = await db.getAllNotificationSettings();
       for (const { userId, settings } of allSettings) {
         const merged = mergeNotificationSettings(settings);

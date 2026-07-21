@@ -326,6 +326,17 @@ export const appRouter = router({
         return { success: true };
       }),
 
+    setRecurrence: publicProcedure
+      .input(z.object({
+        taskId: z.number(),
+        rule: z.string().regex(/^(daily|weekly:[0-6](,[0-6])*)$/).nullable(),
+        endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+      }))
+      .mutation(async ({ input }) => {
+        await db.updateTaskRecurrence(input.taskId, input.rule, input.endDate);
+        return { success: true };
+      }),
+
     checkPriorityLimit: publicProcedure
       .query(async ({ ctx }) => {
         if (!ctx.user) {

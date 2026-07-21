@@ -69,6 +69,14 @@ export const tasks = pgTable("tasks", {
   status: taskStatusEnum("status").default("pending"),
   scheduledTime: text("scheduled_time"), // fixed start time "HH:MM", null = flexible task
   plannedDate: text("planned_date"), // "YYYY-MM-DD" day this task is assigned to; null = unplanned backlog
+  // Recorrência: null = "não repete" | "daily" | "weekly:0,2,4" (dias da
+  // semana, 0=domingo). Só a tarefa-raiz (a que tem a regra) carrega isto —
+  // ocorrências geradas (ver seriesId) nascem com recurrenceRule null.
+  recurrenceRule: text("recurrence_rule"),
+  recurrenceEndDate: text("recurrence_end_date"), // "YYYY-MM-DD" ou null = sem fim
+  // Aponta pro id da tarefa-raiz quando esta linha é uma ocorrência gerada
+  // automaticamente; null na raiz e em tarefas avulsas sem repetição.
+  seriesId: integer("series_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

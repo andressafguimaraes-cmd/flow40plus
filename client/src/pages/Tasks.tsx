@@ -38,11 +38,47 @@ function nearestTimeOption(minutes: number | null | undefined): number {
   return TIME_VALUES.reduce((prev, curr) => (Math.abs(curr - target) < Math.abs(prev - target) ? curr : prev));
 }
 
+const WEEKDAYS_SHORT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+
+// "Não repete" | "todo dia" | "dias específicos da semana" — serializado
+// como texto simples pro banco (recurrenceRule: null | "daily" |
+// "weekly:0,2,4", ver drizzle/schema_postgres.ts) em vez de guardar esse
+// objeto direto, pra não precisar de coluna jsonb só pra isso.
+type RecurrenceValue =
+  | { type: "none" }
+  | { type: "daily"; endDate: string | null }
+  | { type: "weekly"; weekdays: number[]; endDate: string | null };
+
+function serializeRecurrence(r: RecurrenceValue): { rule: string | null; endDate: string | null } {
+  if (r.type === "none") return { rule: null, endDate: null };
+  if (r.type === "daily") return { rule: "daily", endDate: r.endDate };
+  return { rule: `weekly:${[...r.weekdays].sort().join(",")}`, endDate: r.endDate };
+}
+
+function parseRecurrence(rule: string | null | undefined, endDate: string | null | undefined): RecurrenceValue {
+  if (!rule) return { type: "none" };
+  if (rule === "daily") return { type: "daily", endDate: endDate ?? null };
+  if (rule.startsWith("weekly:")) {
+    const weekdays = rule.slice("weekly:".length).split(",").map(Number).filter(n => !Number.isNaN(n));
+    return { type: "weekly", weekdays, endDate: endDate ?? null };
+  }
+  return { type: "none" };
+}
+
+function recurrenceSummary(r: RecurrenceValue): string {
+  if (r.type === "none") return "Não repete";
+  if (r.type === "daily") return "Repete todo dia";
+  if (r.weekdays.length === 0) return "Escolher dias da semana";
+  return `Repete: ${[...r.weekdays].sort().map(d => WEEKDAYS_SHORT[d]).join(", ")}`;
+}
+
 interface EditModalState {
   id: number;
   title: string;
   totalEstimatedTime: number;
   priority: PriorityKey;
+  recurrence: RecurrenceValue;
+  isOccurrence: boolean;
 }
 
 export default function Tasks() {
@@ -59,6 +95,21 @@ export default function Tasks() {
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
   const [newStepInputs, setNewStepInputs] = useState<Record<number, string>>({});
   const [editingStep, setEditingStep] = useState<{ id: number; title: string } | null>(null);
+  const [captureRecurrence, setCaptureRecurrence] = useState<RecurrenceValue>({ type: "none" });
+  const [recurrenceModalFor, setRecurrenceModalFor] = useState<"capture" | "edit" | null>(null);
+
+  // O modal de repetição é compartilhado entre a captura rápida e a edição
+  // de tarefa existente — lê/escreve no estado certo conforme quem o abriu.
+  const currentRecurrence: RecurrenceValue =
+    recurrenceModalFor === "edit" && editModalTask ? editModalTask.recurrence : captureRecurrence;
+
+  const setCurrentRecurrence = (updater: (r: RecurrenceValue) => RecurrenceValue) => {
+    if (recurrenceModalFor === "edit") {
+      setEditModalTask(prev => (prev ? { ...prev, recurrence: updater(prev.recurrence) } : prev));
+    } else {
+      setCaptureRecurrence(updater);
+    }
+  };
 
   const { data: tasks, refetch } = trpc.tasks.list.useQuery();
 
@@ -68,14 +119,38 @@ export default function Tasks() {
     setPriority("sem");
     setAiActive(false);
     setSubmitting(false);
+    setCaptureRecurrence({ type: "none" });
+  };
+
+  const setRecurrenceMutation = trpc.tasks.setRecurrence.useMutation({
+    onError: () => toast.error("Tarefa criada, mas houve erro ao salvar a repetição."),
+  });
+
+  // Awaited (não fire-and-forget): se refetch() rodasse antes dessa gravação
+  // terminar, a lista recarregada mostraria a tarefa como "não repete" por
+  // uma fração de segundo — race condition real, não só cosmética.
+  const applyRecurrence = async (taskId: number, recurrence: RecurrenceValue) => {
+    if (recurrence.type === "none") return;
+    const { rule, endDate } = serializeRecurrence(recurrence);
+    await setRecurrenceMutation.mutateAsync({ taskId, rule, endDate });
   };
 
   const createTask = trpc.tasks.create.useMutation({
-    onSuccess: () => { toast.success("Tarefa adicionada!"); refetch(); resetCapture(); },
+    onSuccess: async data => {
+      toast.success("Tarefa adicionada!");
+      await applyRecurrence(data.taskId, captureRecurrence);
+      refetch();
+      resetCapture();
+    },
     onError: () => { toast.error("Erro ao adicionar tarefa."); setSubmitting(false); },
   });
   const decomposeMutation = trpc.tasks.decompose.useMutation({
-    onSuccess: () => { toast.success("Tarefa dividida em microtarefas! ✨"); refetch(); resetCapture(); },
+    onSuccess: async data => {
+      toast.success("Tarefa dividida em microtarefas! ✨");
+      await applyRecurrence(data.taskId, captureRecurrence);
+      refetch();
+      resetCapture();
+    },
     onError: () => { toast.error("Erro ao dividir em microtarefas. Tente novamente."); setSubmitting(false); },
   });
   const decomposeExistingMutation = trpc.tasks.decomposeExisting.useMutation({
@@ -93,9 +168,29 @@ export default function Tasks() {
   const deleteMicroStep = trpc.tasks.deleteMicroStep.useMutation({ onSuccess: () => refetch() });
   const updatePriority = trpc.tasks.updatePriority.useMutation({ onSuccess: () => refetch() });
   const updateTask = trpc.tasks.update.useMutation({
-    onSuccess: () => { toast.success("Tarefa atualizada!"); refetch(); setEditModalTask(null); },
     onError: () => toast.error("Erro ao salvar alterações."),
   });
+
+  const handleSaveEdit = async () => {
+    if (!editModalTask || !editModalTask.title.trim()) return;
+    await updateTask.mutateAsync({
+      taskId: editModalTask.id,
+      title: editModalTask.title.trim(),
+      totalEstimatedTime: editModalTask.totalEstimatedTime,
+      priority: editModalTask.priority,
+    });
+    if (!editModalTask.isOccurrence) {
+      await applyRecurrence(editModalTask.id, editModalTask.recurrence);
+      // applyRecurrence só grava quando type !== "none" — cobre o caso de
+      // "desligar" a repetição explicitamente, que também precisa persistir.
+      if (editModalTask.recurrence.type === "none") {
+        await setRecurrenceMutation.mutateAsync({ taskId: editModalTask.id, rule: null, endDate: null });
+      }
+    }
+    toast.success("Tarefa atualizada!");
+    refetch();
+    setEditModalTask(null);
+  };
 
   const openEditModal = (task: NonNullable<typeof tasks>[number]) => {
     setEditModalTask({
@@ -103,6 +198,8 @@ export default function Tasks() {
       title: task.title,
       totalEstimatedTime: nearestTimeOption(task.totalEstimatedTime),
       priority: (task.priority ?? "sem") as PriorityKey,
+      recurrence: parseRecurrence(task.recurrenceRule, task.recurrenceEndDate),
+      isOccurrence: task.seriesId != null,
     });
     setMenuOpenId(null);
   };
@@ -402,6 +499,14 @@ export default function Tasks() {
           </button>
 
           <button
+            onClick={() => setRecurrenceModalFor("capture")}
+            className="flex items-center gap-2.5 rounded-[14px] px-3.5 text-[12.5px] font-medium"
+            style={{ height: 44, border: `1px solid ${LINE}`, color: NAVY, background: BG_APP }}
+          >
+            <span>🔁</span> {recurrenceSummary(captureRecurrence)}
+          </button>
+
+          <button
             onClick={handleAdd} disabled={submitting || !taskInput.trim()}
             className="w-full rounded-[14px] text-white text-sm font-semibold transition-all active:scale-[0.98] disabled:opacity-50"
             style={{ height: 46, background: NAVY }}
@@ -493,6 +598,20 @@ export default function Tasks() {
               </div>
             </div>
 
+            {editModalTask.isOccurrence ? (
+              <p className="text-xs font-medium mb-5" style={{ color: TEXT_MUTED }}>
+                🔁 Parte de uma tarefa recorrente — mudar a repetição só é possível na tarefa original.
+              </p>
+            ) : (
+              <button
+                onClick={() => setRecurrenceModalFor("edit")}
+                className="w-full flex items-center gap-2.5 rounded-xl px-3.5 mb-5 text-left text-[13px] font-medium"
+                style={{ height: 44, border: `1px solid ${LINE}`, color: NAVY, background: BG_APP }}
+              >
+                <span>🔁</span> {recurrenceSummary(editModalTask.recurrence)}
+              </button>
+            )}
+
             <div className="flex gap-3">
               <button
                 onClick={() => setEditModalTask(null)}
@@ -502,15 +621,7 @@ export default function Tasks() {
                 Cancelar
               </button>
               <button
-                onClick={() => {
-                  if (!editModalTask.title.trim()) return;
-                  updateTask.mutate({
-                    taskId: editModalTask.id,
-                    title: editModalTask.title.trim(),
-                    totalEstimatedTime: editModalTask.totalEstimatedTime,
-                    priority: editModalTask.priority,
-                  });
-                }}
+                onClick={handleSaveEdit}
                 disabled={!editModalTask.title.trim() || updateTask.isPending}
                 className="flex-1 h-11 rounded-2xl text-white text-sm font-bold disabled:opacity-50"
                 style={{ background: SAGE }}
@@ -518,6 +629,96 @@ export default function Tasks() {
                 {updateTask.isPending ? "Salvando..." : "Salvar"}
               </button>
             </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Modal: Essa tarefa se repete? (compartilhado entre captura e edição) */}
+      {recurrenceModalFor && createPortal(
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center"
+          style={{ background: "rgba(22,54,90,0.4)" }}
+          onClick={() => setRecurrenceModalFor(null)}
+        >
+          <div className="w-full max-w-md rounded-t-3xl p-5" style={{ background: CARD }} onClick={e => e.stopPropagation()}>
+            <div className="w-10 h-1 rounded-full mx-auto mb-4" style={{ background: LINE }} />
+            <h3 className="text-base font-bold mb-4" style={{ color: NAVY }}>🔁 Essa tarefa se repete?</h3>
+
+            <div className="flex flex-col gap-2 mb-4">
+              <button
+                onClick={() => setCurrentRecurrence(() => ({ type: "none" }))}
+                className="w-full text-left rounded-xl px-3.5 py-3 text-[13.5px] font-medium"
+                style={{ border: `1.5px solid ${currentRecurrence.type === "none" ? SAGE : LINE}`, color: NAVY, background: BG_APP }}
+              >
+                Não repete
+              </button>
+              <button
+                onClick={() => setCurrentRecurrence(prev => ({ type: "daily", endDate: prev.type === "none" ? null : prev.endDate }))}
+                className="w-full text-left rounded-xl px-3.5 py-3 text-[13.5px] font-medium"
+                style={{ border: `1.5px solid ${currentRecurrence.type === "daily" ? SAGE : LINE}`, color: NAVY, background: BG_APP }}
+              >
+                Todo dia
+              </button>
+              <button
+                onClick={() => setCurrentRecurrence(prev => ({
+                  type: "weekly",
+                  weekdays: prev.type === "weekly" ? prev.weekdays : [],
+                  endDate: prev.type === "none" ? null : prev.endDate,
+                }))}
+                className="w-full text-left rounded-xl px-3.5 py-3 text-[13.5px] font-medium"
+                style={{ border: `1.5px solid ${currentRecurrence.type === "weekly" ? SAGE : LINE}`, color: NAVY, background: BG_APP }}
+              >
+                Escolher dias da semana
+              </button>
+            </div>
+
+            {currentRecurrence.type === "weekly" && (
+              <div className="grid grid-cols-7 gap-1.5 mb-4">
+                {WEEKDAYS_SHORT.map((label, i) => {
+                  const active = currentRecurrence.weekdays.includes(i);
+                  return (
+                    <button
+                      key={label}
+                      onClick={() => setCurrentRecurrence(prev => {
+                        if (prev.type !== "weekly") return prev;
+                        const weekdays = active ? prev.weekdays.filter(d => d !== i) : [...prev.weekdays, i];
+                        return { ...prev, weekdays };
+                      })}
+                      className="rounded-xl py-2.5 text-[11px] font-bold"
+                      style={{
+                        border: `1.5px solid ${active ? SAGE : LINE}`,
+                        color: active ? SAGE_DARK : TEXT_MUTED,
+                        background: active ? "#E4EFE6" : BG_APP,
+                      }}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {currentRecurrence.type !== "none" && (
+              <div className="mb-5">
+                <label className="text-xs font-semibold mb-1.5 block" style={{ color: TEXT_MUTED }}>Repetir até (opcional)</label>
+                <input
+                  type="date"
+                  value={currentRecurrence.endDate ?? ""}
+                  onChange={e => setCurrentRecurrence(prev => (prev.type === "none" ? prev : { ...prev, endDate: e.target.value || null }))}
+                  className="w-full text-sm rounded-xl px-3.5 py-2.5 outline-none"
+                  style={{ border: `1px solid ${LINE}`, color: NAVY, background: BG_APP }}
+                />
+              </div>
+            )}
+
+            <button
+              onClick={() => setRecurrenceModalFor(null)}
+              className="w-full h-11 rounded-2xl text-white text-sm font-bold"
+              style={{ background: SAGE }}
+            >
+              Confirmar
+            </button>
           </div>
         </div>,
         document.body

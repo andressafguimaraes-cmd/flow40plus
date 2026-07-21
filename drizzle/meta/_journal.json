@@ -36,6 +36,13 @@
       "when": 1784658426175,
       "tag": "0004_fluffy_spitfire",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1784671515749,
+      "tag": "0005_strange_santa_claus",
+      "breakpoints": true
     }
   ]
 }
