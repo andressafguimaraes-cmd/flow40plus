@@ -97,6 +97,11 @@ export default function Tasks() {
   const [editingStep, setEditingStep] = useState<{ id: number; title: string } | null>(null);
   const [captureRecurrence, setCaptureRecurrence] = useState<RecurrenceValue>({ type: "none" });
   const [recurrenceModalFor, setRecurrenceModalFor] = useState<"capture" | "edit" | null>(null);
+  // Um <select> nativo fechado sempre mostra o <option> selecionado na cor
+  // de texto padrão — nenhum navegador aplica o style do option ali, só (às
+  // vezes) na lista aberta. Por isso a bandeirinha/bolinha de prioridade
+  // nunca ficava colorida de verdade; substituído por um dropdown próprio.
+  const [priorityDropdownFor, setPriorityDropdownFor] = useState<"capture" | "edit" | null>(null);
 
   // O modal de repetição é compartilhado entre a captura rápida e a edição
   // de tarefa existente — lê/escreve no estado certo conforme quem o abriu.
@@ -434,7 +439,7 @@ export default function Tasks() {
   };
 
   return (
-    <div className="min-h-screen pb-24" style={{ background: BG_APP }} onClick={() => setMenuOpenId(null)}>
+    <div className="min-h-screen pb-24" style={{ background: BG_APP }} onClick={() => { setMenuOpenId(null); setPriorityDropdownFor(null); }}>
       <div className="px-5 pt-6">
         <h1 className="text-[22px] font-bold mb-4" style={{ color: NAVY }}>Tarefas</h1>
 
@@ -464,16 +469,35 @@ export default function Tasks() {
                 ))}
               </select>
             </div>
-            <div className="flex-1 rounded-[14px] flex items-center px-3" style={{ background: BG_APP, border: `1px solid ${LINE}`, height: 44 }}>
-              <select
-                value={priority} onChange={e => setPriority(e.target.value as PriorityKey)}
-                className="w-full bg-transparent outline-none text-[13px] font-medium appearance-none cursor-pointer"
-                style={{ color: NAVY }}
+            <div className="relative flex-1">
+              <button
+                type="button"
+                onClick={e => { e.stopPropagation(); setPriorityDropdownFor(v => (v === "capture" ? null : "capture")); }}
+                className="w-full flex items-center gap-2 rounded-[14px] px-3 text-[13px] font-medium"
+                style={{ background: BG_APP, border: `1px solid ${LINE}`, height: 44, color: NAVY }}
               >
-                {PRIORITIES.map(p => (
-                  <option key={p.key} value={p.key} style={{ color: p.accent }}>● {p.label}</option>
-                ))}
-              </select>
+                <span className="rounded-full flex-shrink-0" style={{ width: 8, height: 8, background: priorityInfo(priority).accent }} />
+                {priorityInfo(priority).label}
+              </button>
+              {priorityDropdownFor === "capture" && (
+                <div
+                  className="absolute left-0 right-0 z-20 mt-1 rounded-xl overflow-hidden"
+                  style={{ background: CARD, boxShadow: "0 8px 24px rgba(22,54,90,0.18)" }}
+                  onClick={e => e.stopPropagation()}
+                >
+                  {PRIORITIES.map(p => (
+                    <button
+                      key={p.key}
+                      onClick={() => { setPriority(p.key); setPriorityDropdownFor(null); }}
+                      className="w-full flex items-center gap-2 px-3 py-2.5 text-left text-[13px] font-medium"
+                      style={{ color: NAVY }}
+                    >
+                      <span className="rounded-full flex-shrink-0" style={{ width: 8, height: 8, background: p.accent }} />
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -584,17 +608,38 @@ export default function Tasks() {
                   ))}
                 </select>
               </div>
-              <div className="flex-1 rounded-xl flex items-center px-3" style={{ background: BG_APP, border: `1px solid ${LINE}`, height: 44 }}>
-                <select
-                  value={editModalTask.priority}
-                  onChange={e => setEditModalTask(prev => (prev ? { ...prev, priority: e.target.value as PriorityKey } : prev))}
-                  className="w-full bg-transparent outline-none text-[13px] font-medium appearance-none cursor-pointer"
-                  style={{ color: NAVY }}
+              <div className="relative flex-1">
+                <button
+                  type="button"
+                  onClick={e => { e.stopPropagation(); setPriorityDropdownFor(v => (v === "edit" ? null : "edit")); }}
+                  className="w-full flex items-center gap-2 rounded-xl px-3 text-[13px] font-medium"
+                  style={{ background: BG_APP, border: `1px solid ${LINE}`, height: 44, color: NAVY }}
                 >
-                  {PRIORITIES.map(p => (
-                    <option key={p.key} value={p.key} style={{ color: p.accent }}>● {p.label}</option>
-                  ))}
-                </select>
+                  <span className="rounded-full flex-shrink-0" style={{ width: 8, height: 8, background: priorityInfo(editModalTask.priority).accent }} />
+                  {priorityInfo(editModalTask.priority).label}
+                </button>
+                {priorityDropdownFor === "edit" && (
+                  <div
+                    className="absolute left-0 right-0 z-20 mt-1 rounded-xl overflow-hidden"
+                    style={{ background: CARD, boxShadow: "0 8px 24px rgba(22,54,90,0.18)" }}
+                    onClick={e => e.stopPropagation()}
+                  >
+                    {PRIORITIES.map(p => (
+                      <button
+                        key={p.key}
+                        onClick={() => {
+                          setEditModalTask(prev => (prev ? { ...prev, priority: p.key } : prev));
+                          setPriorityDropdownFor(null);
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2.5 text-left text-[13px] font-medium"
+                        style={{ color: NAVY }}
+                      >
+                        <span className="rounded-full flex-shrink-0" style={{ width: 8, height: 8, background: p.accent }} />
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
