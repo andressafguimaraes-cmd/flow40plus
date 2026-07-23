@@ -86,7 +86,7 @@ export default function Planejamento() {
 
   const allTasks = tasks ?? [];
   const tasksByDate = (date: string) => allTasks.filter(t => t.plannedDate === date);
-  const unplannedTasks = allTasks.filter(t => !t.plannedDate);
+  const unplannedTasks = allTasks.filter(t => !t.plannedDate && t.status !== "completed");
 
   const getDayLoadMinutes = (date: string) =>
     tasksByDate(date)
