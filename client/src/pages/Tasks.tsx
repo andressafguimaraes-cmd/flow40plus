@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -91,6 +91,17 @@ export default function Tasks() {
   const [submitting, setSubmitting] = useState(false);
   const [listening, setListening] = useState(false);
   const [expandedTasks, setExpandedTasks] = useState<Record<number, boolean>>({});
+  // Tarefa apontada por um link de notificação de âncora (?done=123) — mostra
+  // um atalho de "concluir" no topo em vez de deixar a usuária catar a
+  // tarefa na lista depois de tocar na notificação.
+  const [highlightTaskId, setHighlightTaskId] = useState<number | null>(null);
+
+  useEffect(() => {
+    const raw = new URLSearchParams(window.location.search).get("done");
+    const id = raw ? Number(raw) : NaN;
+    if (Number.isFinite(id)) setHighlightTaskId(id);
+    window.history.replaceState(null, "", window.location.pathname);
+  }, []);
   const [editModalTask, setEditModalTask] = useState<EditModalState | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
   const [newStepInputs, setNewStepInputs] = useState<Record<number, string>>({});
@@ -266,6 +277,7 @@ export default function Tasks() {
   const allTasks = tasks ?? [];
   const pending = allTasks.filter(t => t.status !== "completed");
   const completed = allTasks.filter(t => t.status === "completed");
+  const highlightTask = highlightTaskId != null ? pending.find(t => t.id === highlightTaskId) ?? null : null;
 
   const groups = PRIORITIES
     .filter(p => filter === "todas" || filter === p.key)
@@ -442,6 +454,26 @@ export default function Tasks() {
     <div className="min-h-screen pb-24" style={{ background: BG_APP }} onClick={() => { setMenuOpenId(null); setPriorityDropdownFor(null); }}>
       <div className="px-5 pt-6">
         <h1 className="text-[22px] font-bold mb-4" style={{ color: NAVY }}>Tarefas</h1>
+
+        {/* Atalho: chegou aqui pelo link de uma notificação de âncora */}
+        {highlightTask && (
+          <div
+            className="flex items-center gap-3 rounded-2xl px-4 py-3.5 mb-4"
+            style={{ background: "#E4EFE6", border: `1px solid ${SAGE}` }}
+          >
+            <span className="text-[15px] flex-shrink-0">⏰</span>
+            <span className="flex-1 min-w-0 text-[13.5px] font-semibold truncate" style={{ color: NAVY }}>
+              {highlightTask.title}
+            </span>
+            <button
+              onClick={() => { updateStatus.mutate({ taskId: highlightTask.id, status: "completed" }); setHighlightTaskId(null); }}
+              className="flex-shrink-0 rounded-xl text-white text-[12.5px] font-bold px-3.5 py-2"
+              style={{ background: SAGE }}
+            >
+              ✓ Concluir
+            </button>
+          </div>
+        )}
 
         {/* Captura rápida */}
         <div className="flex flex-col gap-2 mb-6">

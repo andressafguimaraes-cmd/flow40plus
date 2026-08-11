@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -145,6 +145,17 @@ export default function Dashboard({ onOpenCheckIn }: DashboardProps) {
 
   const suggestedPractice = useSuggestedPractice({ sleepScore: sono, energyScore: energia, clarityScore: clareza });
   const capacidade = Math.round((sono + energia + clareza) / 3);
+
+  // Ao entrar pelo link de uma notificação de pausa (?prompt=pausa), mostra
+  // a prática sugerida na hora — em vez de só abrir o Dashboard parado, já
+  // entrega algo concreto pra fazer (a mesma sugestão do botão "Fazer pausa
+  // de 5 min" abaixo). Remove o parâmetro da URL depois, pra não repetir o
+  // toast se a página recarregar.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("prompt") !== "pausa") return;
+    toast.success(`${suggestedPractice.icone} ${suggestedPractice.titulo} — ${suggestedPractice.descricao}`);
+    window.history.replaceState(null, "", window.location.pathname);
+  }, []);
 
   const allTasks = userTasks ?? [];
   const todosPendentes = allTasks.filter(t => t.status !== "completed");

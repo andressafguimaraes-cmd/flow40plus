@@ -236,6 +236,12 @@ class InMemoryDatabase {
       .filter(t => t.plannedDate === date && !!t.scheduledTime && t.status !== "completed");
   }
 
+  hasCompletedTaskToday(userId: number, dayStart: Date, dayEnd: Date) {
+    return Array.from(this.tasks.values()).some(
+      t => t.userId === userId && t.status === "completed" && t.updatedAt >= dayStart && t.updatedAt < dayEnd
+    );
+  }
+
   updateTaskRecurrence(taskId: number, rule: string | null, endDate: string | null) {
     const task = this.tasks.get(taskId);
     if (task) {

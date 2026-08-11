@@ -3,7 +3,7 @@ import * as db from "../db";
 import { ENV } from "./env";
 import { sendPushToUser } from "./push";
 import { generateUpcomingOccurrences } from "./recurrence";
-import { TIMED_REMINDERS, mergeNotificationSettings } from "@shared/notificationSettings";
+import { TIMED_REMINDERS, PAUSA_IDS, NO_ACTIVITY_MESSAGE, mergeNotificationSettings } from "@shared/notificationSettings";
 
 function brazilNow(): { date: string; time: string } {
   const fmt = new Intl.DateTimeFormat("en-CA", {
@@ -17,6 +17,16 @@ function brazilNow(): { date: string; time: string } {
   });
   const parts = Object.fromEntries(fmt.formatToParts(new Date()).map(p => [p.type, p.value]));
   return { date: `${parts.year}-${parts.month}-${parts.day}`, time: `${parts.hour}:${parts.minute}` };
+}
+
+// Limites do dia (00:00 a 00:00 do dia seguinte) no fuso de Brasília, como
+// objetos Date reais — usado só para comparar com `updatedAt` (timestamp),
+// diferente de `today` (string "YYYY-MM-DD") usada nas outras comparações
+// deste arquivo. Brasília é UTC-3 fixo (sem horário de verão desde 2019).
+function dayBoundsBrazil(dateStr: string): { dayStart: Date; dayEnd: Date } {
+  const dayStart = new Date(`${dateStr}T00:00:00-03:00`);
+  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+  return { dayStart, dayEnd };
 }
 
 // This project runs Vercel Hobby, whose native Cron Jobs only fire once a
@@ -57,9 +67,14 @@ export function registerCronRoutes(app: Express) {
         results.errors++;
       }
 
+      const { dayStart, dayEnd } = dayBoundsBrazil(today);
       const allSettings = await db.getAllNotificationSettings();
       for (const { userId, settings } of allSettings) {
         const merged = mergeNotificationSettings(settings);
+        // Calculada no máximo uma vez por usuária por execução, não uma vez
+        // por lembrete — todas as pausas do dia reaproveitam o mesmo valor.
+        let hasActivityToday: boolean | null = null;
+
         for (const reminder of TIMED_REMINDERS) {
           const state = merged.reminders[reminder.id];
           if (!state?.enabled || nowHM < state.time) continue;
@@ -67,8 +82,18 @@ export function registerCronRoutes(app: Express) {
           const alreadySent = await db.wasNotificationSent(userId, reminder.id, 0, today);
           if (alreadySent) continue;
 
+          let payload: { title: string; body: string; url: string } = reminder;
+          if (PAUSA_IDS.includes(reminder.id)) {
+            if (hasActivityToday === null) {
+              hasActivityToday = await db.hasCompletedTaskToday(userId, dayStart, dayEnd);
+            }
+            payload = hasActivityToday
+              ? { title: reminder.title, body: reminder.body, url: "/dashboard?prompt=pausa" }
+              : NO_ACTIVITY_MESSAGE;
+          }
+
           try {
-            await sendPushToUser(userId, { title: reminder.title, body: reminder.body, url: reminder.url });
+            await sendPushToUser(userId, payload);
             await db.markNotificationSent(userId, reminder.id, 0, today);
             results.dailySent++;
           } catch (error) {
@@ -92,7 +117,7 @@ export function registerCronRoutes(app: Express) {
           await sendPushToUser(task.userId, {
             title: `⏰ ${task.title}`,
             body: `Hora do seu compromisso marcado para ${task.scheduledTime}.`,
-            url: "/tasks",
+            url: `/tasks?done=${task.id}`,
           });
           await db.markNotificationSent(task.userId, "anchor", task.id, today);
           results.anchorsSent++;

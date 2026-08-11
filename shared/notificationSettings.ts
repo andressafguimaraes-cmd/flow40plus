@@ -82,6 +82,19 @@ export const TIMED_REMINDERS: TimedReminderConfig[] = [
   },
 ];
 
+// Pausas condicionadas a atividade: se a usuária não concluiu nenhuma
+// tarefa no dia, "hora da pausa" não faz sentido (não tem do que
+// descansar) — troca pela mensagem abaixo em vez de ficar muda.
+// Recalibração fica de fora de propósito: não é sobre "merecer" a
+// pausa, é sobre repensar o que ainda faz sentido, então dispara sempre.
+export const PAUSA_IDS: readonly NotificationKind[] = ["pausa_manha", "pausa_tarde", "pausa_noite"];
+
+export const NO_ACTIVITY_MESSAGE = {
+  title: "🌱 Precisa de ajuda pra reorganizar o dia?",
+  body: "Sentiu que o dia não engrenou ainda? Vamos ver juntas o que faz mais sentido agora.",
+  url: "/dashboard",
+};
+
 export interface NotificationSettings {
   anchorsEnabled: boolean;
   reminders: Record<NotificationKind, { enabled: boolean; time: string }>;

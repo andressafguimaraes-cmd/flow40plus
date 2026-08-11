@@ -1,4 +1,4 @@
-import { eq, desc, and, gte, count, isNotNull, ne } from "drizzle-orm";
+import { eq, desc, and, gte, lt, count, isNotNull, ne } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { InsertUser, users, morningCheckIns, tasks, microSteps, practices, userPracticeProgress, decompositionHistory, pushSubscriptions, notificationSettings, notificationLog } from "../drizzle/schema_postgres";
@@ -792,4 +792,32 @@ export async function getAnchorTasksForDate(date: string) {
       isNotNull(tasks.scheduledTime),
       ne(tasks.status, "completed"),
     ));
+}
+
+// Usado pra decidir se uma pausa (manhã/tarde/noite) faz sentido — "hora da
+// pausa" não tem propósito se a usuária não concluiu nada no dia ainda.
+// Recebe os limites do dia já calculados no fuso de Brasília pelo chamador
+// (ver brazilNow/dayBoundsBrazil em cronRoutes.ts) — este arquivo não sabe
+// de fuso horário de propósito, só recebe os limites prontos.
+export async function hasCompletedTaskToday(userId: number, dayStart: Date, dayEnd: Date) {
+  const db = await getDb();
+  if (!db) {
+    if (useMemoryFallback) {
+      return memoryDb.hasCompletedTaskToday(userId, dayStart, dayEnd);
+    }
+    throw new Error("Database not available");
+  }
+
+  const result = await db
+    .select({ id: tasks.id })
+    .from(tasks)
+    .where(and(
+      eq(tasks.userId, userId),
+      eq(tasks.status, "completed"),
+      gte(tasks.updatedAt, dayStart),
+      lt(tasks.updatedAt, dayEnd),
+    ))
+    .limit(1);
+
+  return result.length > 0;
 }
