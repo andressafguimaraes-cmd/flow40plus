@@ -41,12 +41,10 @@ function AppShell() {
     const today = new Date().toDateString();
     localStorage.setItem("flow40_last_checkin", today);
     setShowCheckIn(false);
-    setLocation("/dashboard");
   };
 
   const handleCheckInClose = () => {
     setShowCheckIn(false);
-    setLocation("/dashboard");
   };
 
   // Termos & Privacidade são acessíveis mesmo sem autenticação (link no rodapé do Login)
