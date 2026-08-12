@@ -266,7 +266,12 @@ export default function Perfil() {
           <div className="mb-5">
             <p className="text-[11.5px] font-bold uppercase mb-2" style={{ color: TEXT_MUTED, letterSpacing: "0.5px" }}>Admin</p>
             <div className="rounded-[18px] overflow-hidden" style={{ background: CARD, boxShadow: "0 2px 10px rgba(22,54,90,0.03)" }}>
-              <button onClick={() => setShowBroadcast(true)} className="w-full flex items-center gap-3.5 px-4 py-3.5 text-left">
+              <button onClick={() => setLocation("/admin")} className="w-full flex items-center gap-3.5 px-4 py-3.5 text-left">
+                <span className="text-base w-5 text-center" style={{ color: NAVY }}>👥</span>
+                <span className="flex-1 text-[13.5px] font-semibold" style={{ color: NAVY }}>Usuárias</span>
+                <span className="text-xs" style={{ color: "#C4CBC4" }}>›</span>
+              </button>
+              <button onClick={() => setShowBroadcast(true)} className="w-full flex items-center gap-3.5 px-4 py-3.5 text-left" style={{ borderTop: `1px solid ${LINE}` }}>
                 <span className="text-base w-5 text-center" style={{ color: NAVY }}>📢</span>
                 <span className="flex-1 text-[13.5px] font-semibold" style={{ color: NAVY }}>Enviar aviso geral</span>
                 <span className="text-xs" style={{ color: "#C4CBC4" }}>›</span>

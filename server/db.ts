@@ -663,6 +663,45 @@ export async function getAllUserIdsWithPushSubscriptions() {
   return rows.map(r => r.userId);
 }
 
+// Painel de admin (Perfil > Usuárias): lista todo mundo com um resumo de
+// atividade — dado que já existe no banco, sem rastreamento novo. Poucas
+// usuárias hoje, então 3 queries por usuária é simples e rápido o
+// suficiente; não vale a complexidade de um GROUP BY/join agora.
+export async function getAllUsersWithStats() {
+  const db = await getDb();
+  if (!db) {
+    if (useMemoryFallback) {
+      return memoryDb.getAllUsersWithStats();
+    }
+    throw new Error("Database not available");
+  }
+
+  const allUsers = await db.select().from(users).orderBy(desc(users.createdAt));
+
+  return Promise.all(
+    allUsers.map(async u => {
+      const [taskCountRow] = await db.select({ count: count() }).from(tasks).where(eq(tasks.userId, u.id));
+      const [completedCountRow] = await db
+        .select({ count: count() })
+        .from(tasks)
+        .where(and(eq(tasks.userId, u.id), eq(tasks.status, "completed")));
+      const [checkinCountRow] = await db.select({ count: count() }).from(morningCheckIns).where(eq(morningCheckIns.userId, u.id));
+
+      return {
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        createdAt: u.createdAt,
+        lastSignedIn: u.lastSignedIn,
+        taskCount: taskCountRow?.count ?? 0,
+        completedCount: completedCountRow?.count ?? 0,
+        checkinCount: checkinCountRow?.count ?? 0,
+      };
+    })
+  );
+}
+
 export async function deletePushSubscription(endpoint: string) {
   const db = await getDb();
   if (!db) {

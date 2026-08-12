@@ -15,8 +15,9 @@ import { useAuth } from "@/hooks/useAuth";
 import Logo from "@/components/Logo";
 import Termos from "@/pages/Termos";
 import Ajuda from "@/pages/Ajuda";
+import Admin from "@/pages/Admin";
 
-const LEGACY_ROUTES = ["/calendar", "/practices", "/ajuda"];
+const LEGACY_ROUTES = ["/calendar", "/practices", "/ajuda", "/admin"];
 
 function AppShell() {
   const [location, setLocation] = useLocation();
@@ -84,6 +85,7 @@ function AppShell() {
       {location === "/calendar" && <Calendar />}
       {location === "/practices" && <Practices />}
       {location === "/ajuda" && <Ajuda />}
+      {location === "/admin" && <Admin />}
       {!isTabRoute && !isLegacyRoute && <NotFound />}
 
       <BottomNav />

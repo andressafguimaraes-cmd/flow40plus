@@ -845,6 +845,19 @@ export const appRouter = router({
         return { sent: userIds.length - failed, total: userIds.length };
       }),
   }),
+
+  admin: router({
+    listUsers: publicProcedure
+      .query(async ({ ctx }) => {
+        if (!ctx.user) {
+          throw new Error("User not authenticated");
+        }
+        if (ctx.user.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
+        }
+        return db.getAllUsersWithStats();
+      }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;

@@ -438,6 +438,25 @@ class InMemoryDatabase {
     return Array.from(new Set(Array.from(this.pushSubscriptions.values()).map(s => s.userId)));
   }
 
+  getAllUsersWithStats() {
+    return Array.from(this.users.values())
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .map(u => {
+        const userTasks = Array.from(this.tasks.values()).filter(t => t.userId === u.id);
+        return {
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          role: u.role,
+          createdAt: u.createdAt,
+          lastSignedIn: u.lastSignedIn,
+          taskCount: userTasks.length,
+          completedCount: userTasks.filter(t => t.status === "completed").length,
+          checkinCount: Array.from(this.checkIns.values()).filter(c => c.userId === u.id).length,
+        };
+      });
+  }
+
   // Notification settings
   getNotificationSettings(userId: number) {
     return this.notificationSettings.get(userId) ?? null;
