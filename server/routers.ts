@@ -73,7 +73,6 @@ IMPORTANT: Respond ONLY with valid JSON. No markdown. No explanation. No extra t
 
   const response = await invokeLLM({
     model: "gemini-flash-lite-latest",
-    reasoningEffort: "none",
     messages: [{
       role: "user",
       content: prompt,
